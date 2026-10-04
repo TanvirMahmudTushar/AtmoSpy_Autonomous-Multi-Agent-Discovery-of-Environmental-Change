@@ -9,7 +9,9 @@ Every investigation answers four questions with real numbers:
 - **How much** did it change?
 - **Is the change statistically significant**, and is that the same as scientifically important?
 
-![Landing page](screenshots/landing.png)
+| Light | Dark |
+|---|---|
+| ![Landing page](screenshots/landing-light.png) | ![Landing page](screenshots/landing-dark.png) |
 
 ## Features
 
@@ -17,27 +19,41 @@ Every investigation answers four questions with real numbers:
 
 One click scans 16 region and variable pairs at once. Sixteen investigations run the full agent pipeline in parallel, and the results are ranked by criteria that are shown on screen: trend size, significance, data completeness, consistency over time and spatial extent. The scan keeps running if you switch pages and picks up where it left off when you return.
 
-![Discover scan running](screenshots/discover-live.png)
-![Discover results](screenshots/discover-results.png)
+| Light | Dark |
+|---|---|
+| ![Discover scan running](screenshots/discover-live-light.png) | ![Discover scan running](screenshots/discover-live-dark.png) |
+
+| Light | Dark |
+|---|---|
+| ![Discover results](screenshots/discover-results-light.png) | ![Discover results](screenshots/discover-results-dark.png) |
 
 ### Investigate
 
 Ask a question in plain language, such as "Has temperature changed significantly in the Tibetan Plateau since 1990?" The agents plan the work, fetch the data, run the statistics and write up the result. You watch every step live as a node graph and a log.
 
-![Agent graph](screenshots/investigate-graph.png)
+| Light | Dark |
+|---|---|
+| ![Agent graph](screenshots/investigate-graph-light.png) | ![Agent graph](screenshots/investigate-graph-dark.png) |
 
 ### Finding reports
 
 Each finding shows what changed, where, how much and how sure we are. A pixel art scene morphs from the start to the end of the record, and its size follows the effect size, not just the p value. Reports also include a time series with a confidence band, a spatial map of every grid cell, an adversarial review and a "why it may be happening" panel written from cited sources.
 
-![Finding report](screenshots/finding-report.png)
-![Time series and spatial map](screenshots/finding-analysis.png)
+| Light | Dark |
+|---|---|
+| ![Finding report](screenshots/finding-report-light.png) | ![Finding report](screenshots/finding-report-dark.png) |
+
+| Light | Dark |
+|---|---|
+| ![Time series and spatial map](screenshots/finding-analysis-light.png) | ![Time series and spatial map](screenshots/finding-analysis-dark.png) |
 
 ### Globe
 
 Every finding plotted where it happened, with the direction of the biggest change in each region.
 
-![Globe](screenshots/globe.png)
+| Light | Dark |
+|---|---|
+| ![Globe](screenshots/globe-light.png) | ![Globe](screenshots/globe-dark.png) |
 
 ### Watches
 
