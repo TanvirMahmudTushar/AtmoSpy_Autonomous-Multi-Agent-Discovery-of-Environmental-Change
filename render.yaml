@@ -1,0 +1,37 @@
+# Render Blueprint for the AtmoSpy backend (FastAPI). The frontend lives on
+# Vercel and the database on Supabase. Deploy the database first, then this
+# service, then the frontend (see the Deployment section of the README).
+services:
+  - type: web
+    name: atmospy-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    # Pick the region closest to your Supabase project so every query isn't a
+    # transatlantic round trip.
+    region: oregon
+    # Free spins down after ~15 min idle (the first request afterwards takes
+    # ~30-60s) and Watch mode's in-process scheduler stops with it. Use
+    # `starter` for an always-on instance.
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Makes the backend refuse to boot with the dev JWT_SECRET.
+      - key: ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      # Supabase -> Connect -> Session pooler URI (port 5432). Pasted as-is;
+      # the app rewrites the scheme to postgresql+asyncpg://. Do not use the
+      # transaction pooler (port 6543): asyncpg's prepared statements break there.
+      - key: DATABASE_URL
+        sync: false
+      # Your Vercel production URL, e.g. https://atmospy.vercel.app
+      # (comma-separated for more than one, no trailing slash).
+      - key: CORS_ORIGINS
+        sync: false
+      # Optional — add in the dashboard after the first deploy:
+      #   GROQ_API_KEY          enables LLM planning/narration (app works without it)
+      #   NASA_EARTHDATA_TOKEN  activates the GRACE-FO / SMAP adapters
+      #   CORS_ORIGIN_REGEX     allow Vercel preview URLs, e.g. https://atmospy-.*-<team>\.vercel\.app
