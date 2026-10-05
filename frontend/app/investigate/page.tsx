@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, eventsUrl } from "@/lib/api";
 import { useAgentStream } from "@/lib/useAgentStream";
+import { useStoredId } from "@/lib/useStoredId";
 import { Panel, PanelTitle } from "@/components/ui/panel";
 import { PixelButton } from "@/components/ui/button";
 import { AgentFlowGraph } from "@/components/investigate/AgentFlowGraph";
@@ -34,7 +35,11 @@ function InvestigatePageInner() {
   const prefillVariable = searchParams.get("prefill_variable");
 
   const [question, setQuestion] = useState("");
-  const [investigationId, setInvestigationId] = useState<string | null>(resumeId);
+  // The investigation runs on the backend, so its id is kept for the session
+  // and re-attached if the user navigates away and back. An explicit
+  // ?resume= link takes priority.
+  const [storedId, setStoredId] = useStoredId("atmospy:investigation-id");
+  const investigationId = resumeId ?? storedId;
   const [submitting, setSubmitting] = useState(false);
   const [finding, setFinding] = useState<FindingDetail | null>(null);
   const [findingError, setFindingError] = useState<string | null>(null);
@@ -44,12 +49,19 @@ function InvestigatePageInner() {
   // Resuming a past investigation: show its original question read-only
   // above the (still-usable) form, so context isn't lost.
   useEffect(() => {
-    if (!resumeId) return;
+    if (!investigationId) return;
+    let cancelled = false;
     api
-      .getInvestigation(resumeId)
-      .then((inv) => setQuestion(inv.question || ""))
-      .catch(() => {});
-  }, [resumeId]);
+      .getInvestigation(investigationId)
+      .then((inv) => !cancelled && setQuestion((q) => q || inv.question || ""))
+      .catch(() => {
+        // Stored id the backend no longer knows (e.g. after a reset): forget it.
+        if (!cancelled && !resumeId) setStoredId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [investigationId, resumeId, setStoredId]);
 
   // Arriving from the command palette with a region/variable picked —
   // draft a sensible starting question rather than forcing a blank box.
@@ -71,7 +83,7 @@ function InvestigatePageInner() {
     setFindingError(null);
     try {
       const { investigation_id } = await api.createInvestigation(q.trim());
-      setInvestigationId(investigation_id);
+      setStoredId(investigation_id);
     } catch (err) {
       setFindingError(err instanceof Error ? err.message : "Failed to start investigation.");
     } finally {

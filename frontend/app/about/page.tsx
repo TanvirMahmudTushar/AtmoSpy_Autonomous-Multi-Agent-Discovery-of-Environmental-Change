@@ -86,10 +86,10 @@ export default function AboutPage() {
 
         <Panel>
           <PanelTitle>Technology</PanelTitle>
-          <p className="text-sm leading-relaxed text-[var(--app-ink-soft)]">
-            Next.js/TypeScript/Tailwind frontend, FastAPI/Python backend, PostgreSQL + PostGIS (Supabase-portable),
-            Groq (GPT-OSS-120B), NumPy/SciPy/pandas/statsmodels/pymannkendall/ruptures for statistics, MapLibre GL
-            for spatial maps, Recharts for time series.
+          <p className="text-sm leading-relaxed text-[var(--app-ink-soft)] [overflow-wrap:anywhere]">
+            Next.js, TypeScript and Tailwind on the frontend, FastAPI and Python on the backend, PostgreSQL with
+            PostGIS (Supabase works), Groq (GPT-OSS-120B), NumPy, SciPy, pandas, statsmodels, pymannkendall and
+            ruptures for statistics, MapLibre GL for spatial maps, and Recharts for time series.
           </p>
         </Panel>
 

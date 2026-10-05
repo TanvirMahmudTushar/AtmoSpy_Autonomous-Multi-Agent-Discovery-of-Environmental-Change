@@ -16,7 +16,7 @@ import { chromium } from "playwright";
 
 const BASE = process.argv[2] || "http://localhost:3000";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const PAGES = ["/", "/discover", "/investigate", "/globe", "/watches", "/findings", "/datasets", "/journal", "/about", "/login", "/signup", "/home"];
+const PAGES = ["/", "/discover", "/investigate", "/globe", "/watches", "/findings", "/about", "/login", "/signup", "/home"];
 
 const browser = await chromium.launch();
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();

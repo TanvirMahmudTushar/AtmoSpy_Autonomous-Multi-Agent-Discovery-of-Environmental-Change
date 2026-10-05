@@ -21,6 +21,8 @@ const STATIC_PAGES: { title: string; subtitle: string; href: string; icon: IconN
   { title: "Home", subtitle: "Your mission dashboard", href: "/home", icon: "star" },
   { title: "Discover Changes", subtitle: "Autonomous scan across NASA POWER", href: "/discover", icon: "telescope" },
   { title: "Investigate a Question", subtitle: "Ask in plain language", href: "/investigate", icon: "compass" },
+  { title: "Globe", subtitle: "Every finding plotted where it happened", href: "/globe", icon: "earth" },
+  { title: "Watches", subtitle: "Standing checks on a region and variable", href: "/watches", icon: "satellite" },
   { title: "Findings", subtitle: "All discovered environmental changes", href: "/findings", icon: "notebook" },
   { title: "About", subtitle: "Methodology, limitations, citations", href: "/about", icon: "magnifier" },
 ];

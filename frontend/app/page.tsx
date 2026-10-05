@@ -3,6 +3,7 @@ import { PixelSprite } from "@/components/pixel/PixelSprite";
 import { TileSprite } from "@/components/pixel/TileSprite";
 import { Logo } from "@/components/layout/Logo";
 import { HeroAuthCTA } from "@/components/layout/HeroAuthCTA";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 const QUESTION_EXAMPLES = [
   "Find significant changes in soil moisture in South Asia since 2005.",
@@ -22,7 +23,7 @@ const PIPELINE = [
 
 const MISSION_STATS = [
   { value: "1981–25", label: "NASA POWER coverage" },
-  { value: "9", label: "Autonomous agents" },
+  { value: "10", label: "Autonomous agents" },
   { value: "0", label: "Fabricated numbers" },
   { value: "16", label: "Candidates per scan" },
 ];
@@ -34,6 +35,9 @@ export default function LandingPage() {
       <div className="relative border-b border-[var(--app-hud-line)]">
         <div className="grid-texture absolute inset-0" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--app-bg)]" />
+        <div className="absolute right-4 top-4 z-10">
+          <ThemeToggle />
+        </div>
         <div className="relative mx-auto max-w-6xl px-4 py-20 sm:py-28">
           <div className="flex flex-col items-center gap-7 text-center">
             <div className="relative flex h-40 w-40 items-center justify-center sm:h-52 sm:w-52">

@@ -193,12 +193,12 @@ export default function WatchesPage() {
           <Panel className="mb-6">
             <PanelTitle>New watch</PanelTitle>
             <div className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1 text-xs text-[var(--app-muted)]">
+              <label className="flex min-w-0 max-w-full flex-col gap-1 text-xs text-[var(--app-muted)]">
                 Region
                 <select
                   value={regionCode}
                   onChange={(e) => setRegionCode(e.target.value)}
-                  className="rounded-sm border-2 border-[var(--app-border)]/40 bg-[var(--app-panel-alt)] p-2 text-sm text-[var(--app-ink)]"
+                  className="w-full max-w-full rounded-sm border-2 border-[var(--app-border)]/40 bg-[var(--app-panel-alt)] p-2 text-sm text-[var(--app-ink)] sm:w-auto"
                 >
                   {regions.map((r) => (
                     <option key={r.code} value={r.code}>
@@ -207,12 +207,12 @@ export default function WatchesPage() {
                   ))}
                 </select>
               </label>
-              <label className="flex flex-col gap-1 text-xs text-[var(--app-muted)]">
+              <label className="flex min-w-0 max-w-full flex-col gap-1 text-xs text-[var(--app-muted)]">
                 Variable
                 <select
                   value={variableCode}
                   onChange={(e) => setVariableCode(e.target.value)}
-                  className="rounded-sm border-2 border-[var(--app-border)]/40 bg-[var(--app-panel-alt)] p-2 text-sm text-[var(--app-ink)]"
+                  className="w-full max-w-full rounded-sm border-2 border-[var(--app-border)]/40 bg-[var(--app-panel-alt)] p-2 text-sm text-[var(--app-ink)] sm:w-auto"
                 >
                   {variables.map((v) => (
                     <option key={v.code} value={v.code}>
@@ -221,12 +221,12 @@ export default function WatchesPage() {
                   ))}
                 </select>
               </label>
-              <label className="flex flex-col gap-1 text-xs text-[var(--app-muted)]">
+              <label className="flex min-w-0 max-w-full flex-col gap-1 text-xs text-[var(--app-muted)]">
                 Frequency
                 <select
                   value={frequencyDays}
                   onChange={(e) => setFrequencyDays(Number(e.target.value))}
-                  className="rounded-sm border-2 border-[var(--app-border)]/40 bg-[var(--app-panel-alt)] p-2 text-sm text-[var(--app-ink)]"
+                  className="w-full max-w-full rounded-sm border-2 border-[var(--app-border)]/40 bg-[var(--app-panel-alt)] p-2 text-sm text-[var(--app-ink)] sm:w-auto"
                 >
                   {FREQUENCY_OPTIONS.map((f) => (
                     <option key={f.days} value={f.days}>

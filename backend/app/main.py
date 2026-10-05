@@ -13,6 +13,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.api import auth, catalog, discover, findings, investigations, watches
 from app.core.config import get_settings
 from app.db.session import AsyncSessionLocal
+from app.services.recovery import fail_orphaned_investigations
 from app.services.scheduler import scheduler_loop
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -35,6 +36,10 @@ if settings.ENV == "production" and (
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    try:
+        await fail_orphaned_investigations()
+    except Exception:
+        logging.getLogger("app.recovery").exception("Could not clean up unfinished investigations")
     task = asyncio.create_task(scheduler_loop())
     yield
     task.cancel()
