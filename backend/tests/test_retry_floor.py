@@ -47,7 +47,11 @@ async def test_retry_widens_to_dataset_specific_floor_not_1985():
     recorder = AsyncMock()
     recorder.emit = AsyncMock()
 
+    # SMAP is only "active" when NASA_EARTHDATA_TOKEN is set, so without a
+    # token (CI) soil_moisture has no active dataset. Pin the lookup so this
+    # test checks the retry floor, not the environment's credentials.
     with (
+        patch("app.agents.orchestrator.dataset_code_for_variable", return_value=SMAP_DATASET_INFO.code),
         patch("app.agents.orchestrator.nasa_data_agent.run", new=AsyncMock(side_effect=fake_nasa_data_agent_run)),
         patch("app.agents.orchestrator.quality_agent.run", new=AsyncMock(side_effect=fake_quality_agent_run)),
     ):
