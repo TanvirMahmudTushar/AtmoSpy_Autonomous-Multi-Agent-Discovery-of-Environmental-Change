@@ -43,7 +43,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([api.listMyInvestigations(10), api.listFindings({ limit: 6 })])
+    Promise.all([api.listMyInvestigations(10), api.listFindings({ limit: 6, unique: true })])
       .then(([inv, find]) => {
         setInvestigations(inv);
         setFindings(find);

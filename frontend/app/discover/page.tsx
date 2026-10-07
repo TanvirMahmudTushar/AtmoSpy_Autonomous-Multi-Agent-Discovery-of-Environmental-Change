@@ -85,7 +85,7 @@ export default function DiscoverPage() {
           <PixelSprite name="earth" size={56} />
           <p className="max-w-lg text-sm text-[var(--app-ink-soft)]">
             This scans ~16 region/variable combinations end-to-end (data retrieval, quality checks, trend and
-            significance testing, spatial and relationship analysis) — it takes roughly a minute.
+            significance testing, spatial and relationship analysis) — it takes a few minutes. You can switch pages while it runs.
           </p>
           <PixelButton size="lg" onClick={start} disabled={starting}>
             {starting ? "Starting..." : "Discover Changes"}

@@ -1,7 +1,7 @@
 "use client";
 
 import { Moon, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 type Theme = "light" | "dark";
 
@@ -14,31 +14,29 @@ function applyTheme(theme: Theme) {
   }
 }
 
-export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("dark");
-  const [mounted, setMounted] = useState(false);
+// The source of truth is <html data-theme>, which the inline script in
+// app/layout.tsx sets from storage / system preference before first paint.
+// Reading it as an external store keeps every toggle in sync with it.
+function subscribe(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  return () => observer.disconnect();
+}
 
-  useEffect(() => {
-    setMounted(true);
-    let initial: Theme = "dark";
-    try {
-      const stored = localStorage.getItem("etd-theme") as Theme | null;
-      if (stored === "light" || stored === "dark") {
-        initial = stored;
-      } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
-        initial = "light";
-      }
-    } catch {
-      /* ignore */
-    }
-    setTheme(initial);
-    applyTheme(initial);
-  }, []);
+function getTheme(): Theme {
+  return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+}
+
+// Unknown on the server; the label fills in after hydration.
+function getServerTheme(): Theme | null {
+  return null;
+}
+
+export function ThemeToggle() {
+  const theme = useSyncExternalStore<Theme | null>(subscribe, getTheme, getServerTheme);
 
   function toggle() {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    applyTheme(next);
+    applyTheme(getTheme() === "dark" ? "light" : "dark");
   }
 
   return (
@@ -48,8 +46,8 @@ export function ThemeToggle() {
       className="pixel-button flex items-center gap-2 px-3 py-2 bg-[var(--app-panel)] text-[var(--app-ink)]"
       suppressHydrationWarning
     >
-      {mounted && theme === "dark" ? <Moon size={14} /> : <Sun size={14} />}
-      <span className="font-display text-[8px]">{mounted ? (theme === "dark" ? "Night" : "Day") : ""}</span>
+      {theme === "dark" ? <Moon size={14} /> : <Sun size={14} />}
+      <span className="font-display text-[8px]">{theme === null ? "" : theme === "dark" ? "Night" : "Day"}</span>
     </button>
   );
 }

@@ -66,7 +66,8 @@ export function UserMenu() {
     // router transition would unmount it, so that page's own "redirect to
     // /login if signed out" guard wins the race and undoes this navigation.
     // A full reload sidesteps that race entirely.
-    window.location.href = "/";
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate full reload, see above
+    window.location.assign("/");
   }
 
   return (

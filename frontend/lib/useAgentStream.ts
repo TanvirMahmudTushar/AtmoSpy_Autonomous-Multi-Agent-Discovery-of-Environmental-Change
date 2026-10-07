@@ -23,12 +23,20 @@ export function useAgentStream(url: string | null): StreamState {
   const [connectionError, setConnectionError] = useState(false);
   const seenRef = useRef<Set<string>>(new Set());
 
-  useEffect(() => {
-    if (!url) return;
+  // A new stream starts from a clean slate. Reset while rendering when the
+  // url changes (React's "adjust state when a prop changes" pattern), so
+  // the stale steps never paint for a frame.
+  const [streamUrl, setStreamUrl] = useState(url);
+  if (url !== streamUrl) {
+    setStreamUrl(url);
     setSteps([]);
     setDone(false);
     setFinalStatus(null);
     setConnectionError(false);
+  }
+
+  useEffect(() => {
+    if (!url) return;
     seenRef.current = new Set();
 
     const source = new EventSource(url);

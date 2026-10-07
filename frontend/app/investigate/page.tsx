@@ -65,16 +65,22 @@ function InvestigatePageInner() {
 
   // Arriving from the command palette with a region/variable picked —
   // draft a sensible starting question rather than forcing a blank box.
-  useEffect(() => {
-    if (resumeId || (!prefillRegion && !prefillVariable)) return;
-    if (prefillRegion && prefillVariable) {
-      setQuestion(`Has ${prefillVariable} changed significantly in ${prefillRegion}?`);
-    } else if (prefillRegion) {
-      setQuestion(`Has anything changed significantly in ${prefillRegion} in recent decades?`);
-    } else if (prefillVariable) {
-      setQuestion(`Where has ${prefillVariable} changed significantly?`);
+  // Done during render when the params change (React's "adjust state when a
+  // prop changes" pattern) rather than in an effect.
+  const prefillKey = `${resumeId}|${prefillRegion}|${prefillVariable}`;
+  const [draftedFor, setDraftedFor] = useState<string | null>(null);
+  if (draftedFor !== prefillKey) {
+    setDraftedFor(prefillKey);
+    if (!resumeId) {
+      if (prefillRegion && prefillVariable) {
+        setQuestion(`Has ${prefillVariable} changed significantly in ${prefillRegion}?`);
+      } else if (prefillRegion) {
+        setQuestion(`Has anything changed significantly in ${prefillRegion} in recent decades?`);
+      } else if (prefillVariable) {
+        setQuestion(`Where has ${prefillVariable} changed significantly?`);
+      }
     }
-  }, [resumeId, prefillRegion, prefillVariable]);
+  }
 
   async function submit(q: string) {
     if (!q.trim() || submitting) return;

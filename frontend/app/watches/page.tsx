@@ -122,10 +122,9 @@ export default function WatchesPage() {
 
   useEffect(refreshWatches, [user]);
 
-  useEffect(() => {
-    if (!regionCode && regions.length > 0) setRegionCode(regions[0].code);
-    if (!variableCode && variables.length > 0) setVariableCode(variables[0].code);
-  }, [regions, variables, regionCode, variableCode]);
+  // Until the user picks, default to the first region/variable.
+  const selectedRegion = regionCode || regions[0]?.code || "";
+  const selectedVariable = variableCode || variables[0]?.code || "";
 
   // Once a live check-now stream finishes, pull the updated watch snapshot.
   useEffect(() => {
@@ -140,11 +139,11 @@ export default function WatchesPage() {
   }, [stream.done]);
 
   async function createWatch() {
-    if (!regionCode || !variableCode || creating) return;
+    if (!selectedRegion || !selectedVariable || creating) return;
     setCreating(true);
     setError(null);
     try {
-      await api.createWatch(regionCode, variableCode, frequencyDays);
+      await api.createWatch(selectedRegion, selectedVariable, frequencyDays);
       refreshWatches();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create watch.");
@@ -196,7 +195,7 @@ export default function WatchesPage() {
               <label className="flex min-w-0 max-w-full flex-col gap-1 text-xs text-[var(--app-muted)]">
                 Region
                 <select
-                  value={regionCode}
+                  value={selectedRegion}
                   onChange={(e) => setRegionCode(e.target.value)}
                   className="w-full max-w-full rounded-sm border-2 border-[var(--app-border)]/40 bg-[var(--app-panel-alt)] p-2 text-sm text-[var(--app-ink)] sm:w-auto"
                 >
@@ -210,7 +209,7 @@ export default function WatchesPage() {
               <label className="flex min-w-0 max-w-full flex-col gap-1 text-xs text-[var(--app-muted)]">
                 Variable
                 <select
-                  value={variableCode}
+                  value={selectedVariable}
                   onChange={(e) => setVariableCode(e.target.value)}
                   className="w-full max-w-full rounded-sm border-2 border-[var(--app-border)]/40 bg-[var(--app-panel-alt)] p-2 text-sm text-[var(--app-ink)] sm:w-auto"
                 >
@@ -235,7 +234,7 @@ export default function WatchesPage() {
                   ))}
                 </select>
               </label>
-              <PixelButton onClick={createWatch} disabled={creating || !regionCode || !variableCode}>
+              <PixelButton onClick={createWatch} disabled={creating || !selectedRegion || !selectedVariable}>
                 {creating ? "Adding..." : "Add watch"}
               </PixelButton>
             </div>

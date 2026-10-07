@@ -5,6 +5,11 @@ import { PixelSprite } from "@/components/pixel/PixelSprite";
 import type { ICONS } from "@/components/pixel/icons";
 import type { InvestigationStep } from "@/lib/types";
 
+function stepTime(step: InvestigationStep): string {
+  const ts = step.ts || step.created_at;
+  return ts ? new Date(ts).toLocaleTimeString(undefined, { hour12: false }) : "—";
+}
+
 function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
   if (value === null || value === undefined) return <span className="text-[var(--app-muted)]">null</span>;
   if (typeof value === "number") return <span style={{ color: "var(--app-accent-gold)" }}>{value}</span>;
@@ -103,7 +108,7 @@ export function NodeDetailModal({
             {steps.map((s, i) => (
               <div key={i} className="border-l-2 border-[var(--app-border)]/40 pl-2 text-xs">
                 <span className="font-mono-data text-[var(--app-muted)]">
-                  {new Date(s.ts || s.created_at || Date.now()).toLocaleTimeString(undefined, { hour12: false })}
+                  {stepTime(s)}
                 </span>{" "}
                 <span className="uppercase" style={{ color: s.status === "error" ? "var(--chart-critical)" : s.status === "done" ? "var(--chart-good)" : "var(--app-accent-cyan)" }}>
                   {s.status}
@@ -116,7 +121,7 @@ export function NodeDetailModal({
           {latestWithDetail ? (
             <>
               <div className="label-telemetry mb-2">
-                Raw computed data (from {new Date(latestWithDetail.ts || latestWithDetail.created_at || Date.now()).toLocaleTimeString(undefined, { hour12: false })})
+                Raw computed data (from {stepTime(latestWithDetail)})
               </div>
               <pre className="overflow-x-auto rounded-sm bg-[var(--app-bg-deep)] p-3 font-mono-data text-[11px] leading-relaxed">
                 <JsonValue value={latestWithDetail.detail} />

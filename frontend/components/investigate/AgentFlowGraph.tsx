@@ -1,7 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ReactFlow, Background, BackgroundVariant, Controls, type Edge, type Node, type NodeMouseHandler } from "@xyflow/react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ReactFlow,
+  Background,
+  BackgroundVariant,
+  Controls,
+  useNodesState,
+  type Edge,
+  type Node,
+  type NodeMouseHandler,
+} from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { NODE_TYPES, type AgentFlowNodeData, type FlowNodeStatus } from "./AgentFlowNode";
 import { NodeDetailModal } from "./NodeDetailModal";
@@ -77,7 +86,7 @@ const CANDIDATE_LABEL = /^\[([^\]]+)\]/;
 export function AgentFlowGraph({ steps, mode = "single" }: { steps: InvestigationStep[]; mode?: "single" | "aggregate" }) {
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
 
-  const { nodes, edges } = useMemo(() => {
+  const { nodes: builtNodes, edges } = useMemo(() => {
     const nodes: Node<AgentFlowNodeData>[] = STAGES.map((stage) => {
       let status: FlowNodeStatus = "pending";
       let message: string | undefined;
@@ -126,6 +135,21 @@ export function AgentFlowGraph({ steps, mode = "single" }: { steps: Investigatio
     return { nodes, edges };
   }, [steps, mode]);
 
+  // React Flow drops a node's measured size and handle positions whenever it
+  // receives a new node object, and only re-measures nodes whose DOM size then
+  // changes — the rest stay hidden with their edges gone. So keep the nodes in
+  // React Flow state (onNodesChange records the measurements) and swap only
+  // `data` as SSE steps arrive.
+  const [nodes, setNodes, onNodesChange] = useNodesState(builtNodes);
+  useEffect(() => {
+    setNodes((prev) =>
+      builtNodes.map((node) => {
+        const existing = prev.find((p) => p.id === node.id);
+        return existing ? { ...existing, data: node.data } : node;
+      }),
+    );
+  }, [builtNodes, setNodes]);
+
   const onNodeClick: NodeMouseHandler = (_, node) => setSelectedStageId(node.id);
   const selectedStage = STAGES.find((s) => s.id === selectedStageId);
   const selectedSteps = selectedStage ? steps.filter((s) => s.agent === selectedStage.agent) : [];
@@ -135,6 +159,7 @@ export function AgentFlowGraph({ steps, mode = "single" }: { steps: Investigatio
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onNodesChange={onNodesChange}
         nodeTypes={NODE_TYPES}
         fitView
         fitViewOptions={{ padding: 0.15 }}

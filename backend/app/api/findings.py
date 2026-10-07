@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user_optional
@@ -22,6 +22,7 @@ async def list_findings(
     significance: str | None = Query(None, pattern="^(statistically_significant|not_significant)$"),
     investigation_id: uuid.UUID | None = None,
     mine: bool = False,
+    unique: bool = False,
     limit: int = Query(50, le=200),
 ):
     stmt = (
@@ -31,6 +32,19 @@ async def list_findings(
         .order_by(Finding.created_at.desc())
         .limit(limit)
     )
+    if unique:
+        # Re-running the same region/variable/period is deterministic, so the
+        # repeats add nothing to a feed — keep only the newest of each.
+        rank = (
+            func.row_number()
+            .over(
+                partition_by=(Finding.variable_id, Finding.region_id, Finding.period_start, Finding.period_end),
+                order_by=Finding.created_at.desc(),
+            )
+            .label("rank")
+        )
+        latest = select(Finding.id.label("id"), rank).subquery()
+        stmt = stmt.join(latest, latest.c.id == Finding.id).where(latest.c.rank == 1)
     if variable_code:
         stmt = stmt.where(Variable.code == variable_code)
     if region_code:

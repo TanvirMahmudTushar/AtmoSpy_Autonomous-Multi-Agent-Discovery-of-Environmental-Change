@@ -65,3 +65,33 @@ async def test_create_investigation_returns_id_and_schedules_background_run():
         body = resp.json()
         assert "investigation_id" in body
         mocked.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_unhandled_error_still_carries_cors_headers():
+    """A crash must reach the browser as a readable 500, not as a CORS
+    failure: an error response without Access-Control-Allow-Origin is
+    reported by the browser as 'blocked by CORS policy'."""
+    from app.core.config import get_settings
+
+    async def _boom():
+        raise RuntimeError("boom")
+
+    app.add_api_route("/api/_test_boom", _boom)
+    origin = get_settings().cors_origins_list[0]
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/_test_boom", headers={"Origin": origin})
+    assert resp.status_code == 500
+    assert resp.json() == {"detail": "Internal server error."}
+    assert resp.headers.get("access-control-allow-origin") == origin
+
+
+@pytest.mark.asyncio
+async def test_list_findings_unique_has_one_per_region_variable_period():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/findings", params={"unique": "true", "limit": 200})
+    assert resp.status_code == 200
+    keys = [(f["region_code"], f["variable_code"], f["period_start"], f["period_end"]) for f in resp.json()]
+    assert len(keys) == len(set(keys))

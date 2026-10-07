@@ -2,7 +2,7 @@
 
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import type { SpatialMapChartData } from "@/lib/types";
 import { cellSpacing, cellSquare } from "./gridGeo";
 
@@ -94,7 +94,9 @@ export function SpatialMap({ data }: { data: SpatialMapChartData }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const dataRef = useRef(data);
-  dataRef.current = data;
+  useLayoutEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   // Mount the map exactly once per container. Recreating a MapLibre
   // instance on every prop change is expensive and, worse, is not safe
@@ -138,7 +140,6 @@ export function SpatialMap({ data }: { data: SpatialMapChartData }) {
       map.remove();
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Data (or a finding switch) after the initial mount: update the source

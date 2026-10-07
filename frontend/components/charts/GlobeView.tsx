@@ -2,7 +2,7 @@
 
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ChangeGlyph, DirectionBadge } from "@/components/change/ChangeGlyph";
 import { api } from "@/lib/api";
@@ -137,11 +137,13 @@ export function GlobeView() {
   const [aggs, setAggs] = useState<RegionAgg[]>([]);
   const [loading, setLoading] = useState(true);
   const aggsRef = useRef<RegionAgg[]>([]);
-  aggsRef.current = aggs;
+  useLayoutEffect(() => {
+    aggsRef.current = aggs;
+  }, [aggs]);
   const openRegionPopupRef = useRef<((agg: RegionAgg, at: maplibregl.LngLatLike) => void) | null>(null);
 
   useEffect(() => {
-    Promise.all([api.listFindings({ limit: 200 }), api.getRegions()])
+    Promise.all([api.listFindings({ limit: 200, unique: true }), api.getRegions()])
       .then(([findings, regions]) => setAggs(aggregateByRegion(findings, regions)))
       .catch(() => setAggs([]))
       .finally(() => setLoading(false));
@@ -298,7 +300,6 @@ export function GlobeView() {
       map.remove();
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // One glyph marker per region, showing its biggest change (Then -> Now), so

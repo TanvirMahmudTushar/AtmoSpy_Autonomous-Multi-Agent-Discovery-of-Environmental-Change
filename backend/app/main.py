@@ -51,15 +51,6 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title=settings.APP_NAME, version="0.1.0", lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_origin_regex=settings.CORS_ORIGIN_REGEX or None,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 
 class RequestObservabilityMiddleware(BaseHTTPMiddleware):
     """Structured per-request logging (request id, latency, status) and a
@@ -78,7 +69,11 @@ class RequestObservabilityMiddleware(BaseHTTPMiddleware):
             logger.exception(
                 "[%s] %s %s failed after %.1fms", request_id, request.method, request.url.path, duration_ms
             )
-            raise
+            # Answer here rather than re-raising: an exception that escapes to
+            # Starlette's outermost error handler is answered without CORS
+            # headers, which the browser then reports as a CORS failure and
+            # hides the real 500 from the frontend.
+            response = JSONResponse(status_code=500, content={"detail": "Internal server error."})
         duration_ms = (time.perf_counter() - start) * 1000
         logger.info(
             "[%s] %s %s -> %s (%.1fms)",
@@ -92,6 +87,17 @@ class RequestObservabilityMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(RequestObservabilityMiddleware)
+
+# Added last so it is the outermost middleware: every response, including
+# the 500s produced above, carries CORS headers.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list,
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX or None,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.exception_handler(Exception)

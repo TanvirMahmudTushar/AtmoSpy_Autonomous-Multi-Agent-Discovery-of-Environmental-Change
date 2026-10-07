@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { FindingReport } from "@/components/findings/FindingReport";
 import { Panel } from "@/components/ui/panel";
@@ -22,6 +23,9 @@ export function FindingDetailClient({ id }: { id: string }) {
       {error && (
         <Panel className="border-[var(--chart-critical)]">
           <p className="text-sm text-[var(--chart-critical)]">{error}</p>
+          <Link href="/findings" className="mt-3 inline-block text-sm text-[var(--app-accent-cyan)] underline">
+            Browse all findings
+          </Link>
         </Panel>
       )}
       {!finding && !error && <p className="text-sm text-[var(--app-muted)]">Loading...</p>}

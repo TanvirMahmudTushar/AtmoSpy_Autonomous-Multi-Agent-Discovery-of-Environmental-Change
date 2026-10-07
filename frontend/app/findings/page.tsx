@@ -20,13 +20,23 @@ export default function FindingsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     api
-      .listFindings({ significance: significance || undefined, limit: 100 })
-      .then(setFindings)
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load findings."))
-      .finally(() => setLoading(false));
+      .listFindings({ significance: significance || undefined, unique: true, limit: 100 })
+      .then((list) => !cancelled && setFindings(list))
+      .catch((err) => !cancelled && setError(err instanceof Error ? err.message : "Failed to load findings."))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
   }, [significance]);
+
+  function changeFilter(value: string) {
+    if (value === significance) return;
+    setSignificance(value);
+    setLoading(true);
+    setError(null);
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -39,7 +49,7 @@ export default function FindingsPage() {
         {SIGNIFICANCE_OPTIONS.map((opt) => (
           <button
             key={opt.value}
-            onClick={() => setSignificance(opt.value)}
+            onClick={() => changeFilter(opt.value)}
             className={`rounded-sm border-2 px-3 py-1.5 font-display text-[9px] ${
               significance === opt.value
                 ? "border-[var(--app-accent-green)] bg-[var(--app-accent-green)] text-[#fbf5e6]"

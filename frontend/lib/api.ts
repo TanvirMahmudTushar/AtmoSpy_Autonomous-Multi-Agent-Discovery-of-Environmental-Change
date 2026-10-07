@@ -32,17 +32,34 @@ export function setToken(token: string | null): void {
   }
 }
 
+/** An HTTP error from the API. `status` is 0 when the request never got a
+ * response (network down, backend asleep, CORS-blocked). */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers || {}),
-    },
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers || {}),
+      },
+      cache: "no-store",
+    });
+  } catch {
+    throw new ApiError("Could not reach the server. Please try again in a moment.", 0);
+  }
   if (!res.ok) {
     let detail = "";
     try {
@@ -51,7 +68,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       detail = await res.text().catch(() => "");
     }
-    throw new Error(detail || `API ${path} failed: ${res.status}`);
+    throw new ApiError(detail || `API ${path} failed: ${res.status}`, res.status);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -77,6 +94,8 @@ export const api = {
     significance?: string;
     investigation_id?: string;
     mine?: boolean;
+    /** Only the newest finding per region/variable/period (hides repeat runs). */
+    unique?: boolean;
     limit?: number;
   }) => {
     const qs = new URLSearchParams();
@@ -85,6 +104,7 @@ export const api = {
     if (params?.significance) qs.set("significance", params.significance);
     if (params?.investigation_id) qs.set("investigation_id", params.investigation_id);
     if (params?.mine) qs.set("mine", "true");
+    if (params?.unique) qs.set("unique", "true");
     if (params?.limit) qs.set("limit", String(params.limit));
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return request<FindingSummary[]>(`/api/findings${suffix}`);

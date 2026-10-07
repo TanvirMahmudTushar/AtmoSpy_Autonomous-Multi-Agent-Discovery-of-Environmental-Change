@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { api, getToken, setToken } from "./api";
+import { ApiError, api, getToken, setToken } from "./api";
 import type { User } from "./types";
 
 interface AuthState {
@@ -23,16 +23,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    api
-      .me()
-      .then(setUser)
-      .catch(() => setToken(null)) // stale/expired token — drop it silently
-      .finally(() => setLoading(false));
+    // Only a 401 means the token is bad. Anything else (the free-tier backend
+    // waking up, a network blip, a 5xx) is retried, and the token is kept
+    // either way: dropping it would sign the user out for good, and a guest
+    // has no way to sign back in to their account.
+    let cancelled = false;
+    (async () => {
+      const retryDelays = [2000, 5000, 10000, 20000];
+      for (let attempt = 0; getToken(); attempt++) {
+        try {
+          const me = await api.me();
+          if (!cancelled) setUser(me);
+          break;
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 401) {
+            setToken(null);
+            break;
+          }
+          if (attempt >= retryDelays.length || cancelled) break;
+          await new Promise((r) => setTimeout(r, retryDelays[attempt]));
+        }
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

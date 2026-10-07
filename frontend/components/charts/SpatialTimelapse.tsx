@@ -2,7 +2,7 @@
 
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SpatialTimelapseChartData } from "@/lib/types";
 import { cellSpacing, cellSquare } from "./gridGeo";
 
@@ -40,7 +40,9 @@ export function SpatialTimelapse({ data }: { data: SpatialTimelapseChartData }) 
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const dataRef = useRef(data);
-  dataRef.current = data;
+  useLayoutEffect(() => {
+    dataRef.current = data;
+  }, [data]);
   const cellSizeRef = useRef({ dLon: 0.625, dLat: 0.5 });
 
   const [yearIndex, setYearIndex] = useState(0);
@@ -50,7 +52,6 @@ export function SpatialTimelapse({ data }: { data: SpatialTimelapseChartData }) 
   const currentYear = years[yearIndex];
   const valueMin = data.value_min ?? 0;
   const valueMax = data.value_max ?? 1;
-  const valueMid = (valueMin + valueMax) / 2;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -131,7 +132,6 @@ export function SpatialTimelapse({ data }: { data: SpatialTimelapseChartData }) 
       map.remove();
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Swap the source data whenever the scrubber year changes.

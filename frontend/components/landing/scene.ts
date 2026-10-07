@@ -317,7 +317,7 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.domElement.style.display = "block";
   renderer.domElement.style.touchAction = "pan-y";
   container.appendChild(renderer.domElement);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { PixelSprite } from "@/components/pixel/PixelSprite";
@@ -38,17 +38,24 @@ export function CommandPalette() {
   const loadedRef = useRef(false);
 
   useEffect(() => {
+    // Every open starts from an empty search with the first item active.
+    function openFresh() {
+      setQuery("");
+      setActiveIndex(0);
+      setOpen(true);
+    }
     function onKeyDown(e: KeyboardEvent) {
       const isMeta = e.metaKey || e.ctrlKey;
       if (isMeta && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setOpen((v) => !v);
+        if (open) setOpen(false);
+        else openFresh();
       } else if (e.key === "Escape" && open) {
         setOpen(false);
       }
     }
     function onOpenRequest() {
-      setOpen(true);
+      openFresh();
     }
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("open-command-palette", onOpenRequest);
@@ -64,17 +71,16 @@ export function CommandPalette() {
       api.getRegions().then(setRegions).catch(() => {});
       api.getVariables().then(setVariables).catch(() => {});
     }
-    if (open) {
-      setQuery("");
-      setActiveIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 10);
-    }
+    if (open) setTimeout(() => inputRef.current?.focus(), 10);
   }, [open]);
 
-  function go(href: string) {
-    setOpen(false);
-    router.push(href);
-  }
+  const go = useCallback(
+    (href: string) => {
+      setOpen(false);
+      router.push(href);
+    },
+    [router],
+  );
 
   const items: PaletteItem[] = useMemo(() => {
     const pages: PaletteItem[] = STATIC_PAGES.map((p) => ({
@@ -105,7 +111,7 @@ export function CommandPalette() {
     }));
 
     return [...pages, ...regionItems, ...variableItems];
-  }, [regions, variables]);
+  }, [regions, variables, go]);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return items.slice(0, 8);
@@ -113,7 +119,6 @@ export function CommandPalette() {
     return items.filter((it) => it.keywords.toLowerCase().includes(q)).slice(0, 12);
   }, [items, query]);
 
-  useEffect(() => setActiveIndex(0), [query]);
 
   function onInputKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
@@ -138,7 +143,10 @@ export function CommandPalette() {
           <input
             ref={inputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActiveIndex(0);
+            }}
             onKeyDown={onInputKeyDown}
             placeholder="Jump to a page, region, or variable..."
             className="flex-1 bg-transparent text-sm text-[var(--app-ink)] outline-none placeholder:text-[var(--app-muted)]"

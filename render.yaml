@@ -7,8 +7,10 @@ services:
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    # Pick the region closest to your Supabase project so every query isn't a
-    # transatlantic round trip.
+    # Must match the Supabase project's region: every query pays the round
+    # trip between them, several times per request. The database is in
+    # Supabase "West US (Oregon)" (us-west-2), so this is oregon. With the
+    # database in Sydney instead, /api/health took ~1.15s; same region ~0.3s.
     region: oregon
     # Free spins down after ~15 min idle (the first request afterwards takes
     # ~30-60s) and Watch mode's in-process scheduler stops with it. Use
