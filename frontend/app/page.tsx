@@ -33,13 +33,19 @@ const MISSION_STATS = [
 export default function LandingPage() {
   return (
     <div className="relative overflow-hidden">
-      {/* Top bar: small logo left, theme toggle right. */}
-      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+      {/* Top bar: small logo left; sign-in buttons + theme toggle right. */}
+      <header className="relative z-10 mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
         <Link href="/" className="flex items-center gap-2" aria-label="AtmoSpy home">
           <Logo size={36} className="drop-shadow-[0_0_10px_var(--app-glow)]" />
           <span className="font-display text-[11px] text-[var(--app-ink)]">AtmoSpy</span>
         </Link>
-        <ThemeToggle />
+        {/* Phones: toggle stays on the logo row, auth buttons wrap below. */}
+        <div className="order-3 w-full sm:order-2 sm:ml-auto sm:w-auto">
+          <HeroAuthCTA />
+        </div>
+        <div className="order-2 sm:order-3">
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Hero: the crew at work. */}
@@ -62,7 +68,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pitch + sign-in. */}
+      {/* Pitch. */}
       <div className="relative border-y border-[var(--app-hud-line)] mt-12">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[var(--app-bg)]" />
         <div className="relative mx-auto max-w-6xl px-4 py-16 sm:py-20">
@@ -75,8 +81,6 @@ export default function LandingPage() {
               <strong className="glow-text-cyan">statistically significant</strong> — using real NASA Earth
               observation data and an autonomous investigation pipeline, not guesses.
             </p>
-
-            <HeroAuthCTA />
 
             <div className="mt-4 grid grid-cols-2 gap-x-10 gap-y-4 sm:grid-cols-4">
               {MISSION_STATS.map((s) => (

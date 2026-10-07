@@ -15,6 +15,16 @@ Every investigation answers four questions with real numbers:
 
 ## Features
 
+### Meet the crew
+
+The landing page opens on a 3D island where the agents act out a live investigation. A glowing orb carries a real Discover topic, such as "Soil moisture · Lake Chad Basin", from agent to agent: the data agent downloads it from the satellite, statistics crunches it, trend plots it, spatial probes the grid cells, the skeptic challenges it and the report agent files it as a finding. A panel shows which stage the investigation is at. Drag to rotate the island, and click an agent to see what it does and what it is doing right now.
+
+| Light | Dark |
+|---|---|
+| ![Meet the crew close-up](screenshots/crew-light.png) | ![Meet the crew close-up](screenshots/crew-dark.png) |
+
+The scene is an illustration of the pipeline. Its topics are real Discover pairs, but it computes nothing and shows no numbers.
+
 ### Discover
 
 One click scans 16 region and variable pairs at once. Sixteen investigations run the full agent pipeline in parallel, and the results are ranked by criteria that are shown on screen: trend size, significance, data completeness, consistency over time and spatial extent. The scan keeps running if you switch pages and picks up where it left off when you return.
