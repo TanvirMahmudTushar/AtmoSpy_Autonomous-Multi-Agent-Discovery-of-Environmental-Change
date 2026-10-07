@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Panel, PanelTitle } from "@/components/ui/panel";
 import { PixelSprite } from "@/components/pixel/PixelSprite";
 import { TileSprite } from "@/components/pixel/TileSprite";
@@ -32,27 +33,43 @@ const MISSION_STATS = [
 export default function LandingPage() {
   return (
     <div className="relative overflow-hidden">
-      {/* Mission hero — telemetry framing over the global starfield backdrop. */}
-      <div className="relative border-b border-[var(--app-hud-line)]">
-        <div className="grid-texture absolute inset-0" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--app-bg)]" />
-        <div className="absolute right-4 top-4 z-10">
-          <ThemeToggle />
-        </div>
-        <div className="relative mx-auto max-w-6xl px-4 py-20 sm:py-28">
-          <div className="flex flex-col items-center gap-7 text-center">
-            <div className="relative flex h-40 w-40 items-center justify-center sm:h-52 sm:w-52">
-              <div className="orbit-ring absolute inset-0" />
-              <div className="orbit-ring orbit-spin-slow absolute inset-4 opacity-60" />
-              <div className="orbit-spin-fast absolute inset-0">
-                <span className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 rounded-full bg-[var(--app-accent-cyan)] shadow-[0_0_8px_var(--app-accent-cyan)]" />
-              </div>
-              <Logo size={112} className="relative drop-shadow-[0_0_24px_var(--app-glow)]" />
-            </div>
+      {/* Top bar: small logo left, theme toggle right. */}
+      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+        <Link href="/" className="flex items-center gap-2" aria-label="AtmoSpy home">
+          <Logo size={36} className="drop-shadow-[0_0_10px_var(--app-glow)]" />
+          <span className="font-display text-[11px] text-[var(--app-ink)]">AtmoSpy</span>
+        </Link>
+        <ThemeToggle />
+      </header>
 
-            <h1 className="font-display text-[20px] leading-relaxed text-[var(--app-ink)] sm:text-[30px]">
-              Earth is always changing.
+      {/* Hero: the crew at work. */}
+      <section className="relative">
+        <div className="grid-texture absolute inset-0 opacity-60" />
+        <div className="relative mx-auto max-w-7xl px-4 pt-4 sm:pt-6">
+          <div className="text-center">
+            <div className="label-telemetry">Mission crew · live</div>
+            <h1 className="mt-3 font-display text-[18px] leading-relaxed text-[var(--app-ink)] sm:text-[26px]">
+              Meet the crew
             </h1>
+            <p className="mx-auto mt-2 max-w-xl text-balance text-[var(--app-ink-soft)]">
+              Follow one investigation as it moves through the pipeline, from a NASA satellite download to a filed,
+              double-checked finding.
+            </p>
+          </div>
+          <div className="mt-4">
+            <AgentDiorama />
+          </div>
+        </div>
+      </section>
+
+      {/* Pitch + sign-in. */}
+      <div className="relative border-y border-[var(--app-hud-line)] mt-12">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[var(--app-bg)]" />
+        <div className="relative mx-auto max-w-6xl px-4 py-16 sm:py-20">
+          <div className="flex flex-col items-center gap-7 text-center">
+            <h2 className="font-display text-[18px] leading-relaxed text-[var(--app-ink)] sm:text-[26px]">
+              Earth is always changing.
+            </h2>
             <p className="max-w-2xl text-balance text-lg text-[var(--app-ink-soft)]">
               Let&apos;s find out <em>where</em>, <em>how much</em>, and whether the change is{" "}
               <strong className="glow-text-cyan">statistically significant</strong> — using real NASA Earth
@@ -72,18 +89,6 @@ export default function LandingPage() {
           </div>
         </div>
       </div>
-
-      <section className="mx-auto max-w-6xl px-4 pt-16 sm:pt-20">
-        <div className="mb-2 text-center">
-          <h2 className="font-display text-[12px] leading-relaxed text-[var(--app-ink)] sm:text-[14px]">
-            Meet the crew
-          </h2>
-          <p className="mt-2 text-sm text-[var(--app-ink-soft)]">
-            Six agents, one investigation. Here&apos;s what each of them is doing right now.
-          </p>
-        </div>
-        <AgentDiorama />
-      </section>
 
       <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20">
         <div className="mt-0 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">

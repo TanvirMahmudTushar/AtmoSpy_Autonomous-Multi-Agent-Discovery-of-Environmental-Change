@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { AGENTS, AGENT_BY_ID, type AgentId } from "./agents";
+import { AGENTS, AGENT_BY_ID, INVESTIGATION_TOPICS, PIPELINE_STAGES, type AgentId } from "./agents";
 
 /**
  * The landing-page "mission crew" diorama: a floating voxel island where each
@@ -15,6 +15,10 @@ export interface DioramaHandle {
 
 interface DioramaOptions {
   onSelect(id: AgentId | null): void;
+  /** The investigation orb reached a stage (index into PIPELINE_STAGES). */
+  onStage?(stage: number, topic: string): void;
+  /** The report agent filed a finding. */
+  onFinding?(topic: string, count: number): void;
 }
 
 type V2 = { x: number; z: number };
@@ -102,6 +106,82 @@ function drawTag(ctx: CanvasRenderingContext2D, text: string, color: string) {
   ctx.textBaseline = "middle";
   ctx.fillText(text, w / 2, h / 2 + 2);
 }
+
+function makeGlowTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, "rgba(255,255,255,1)");
+  g.addColorStop(0.35, "rgba(255,255,255,0.45)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function drawBubble(ctx: CanvasRenderingContext2D, text: string, color: string) {
+  const w = ctx.canvas.width;
+  const boxH = 80;
+  ctx.fillStyle = "#ffffff";
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.roundRect(6, 6, w - 12, boxH, 14);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(w / 2 - 14, boxH + 3);
+  ctx.lineTo(w / 2, boxH + 24);
+  ctx.lineTo(w / 2 + 14, boxH + 3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(w / 2 - 14, boxH + 6);
+  ctx.lineTo(w / 2, boxH + 24);
+  ctx.lineTo(w / 2 + 14, boxH + 6);
+  ctx.stroke();
+  let size = 22;
+  ctx.font = `${size}px ${PIXEL_FONT}`;
+  const measured = ctx.measureText(text).width;
+  if (measured > w - 44) {
+    size = Math.floor((size * (w - 44)) / measured);
+    ctx.font = `${size}px ${PIXEL_FONT}`;
+  }
+  ctx.fillStyle = "#1b2335";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, w / 2, 6 + boxH / 2 + 2);
+}
+
+const ARRIVE_LINES: Record<AgentId, string> = {
+  data: "Fresh NASA data!",
+  stats: "Crunching the numbers",
+  trend: "Drawing the trend",
+  spatial: "Where is it changing?",
+  skeptic: "Prove it.",
+  report: "Writing it up!",
+};
+
+const CHATTER: Record<AgentId, string[]> = {
+  data: ["Downlink locked!", "Decades of records", "SMAP pass incoming", "GRACE data too!"],
+  stats: ["Mann-Kendall time", "Sen's slope: done", "Checking the p-value", "No guessing here"],
+  trend: ["Look at that slope", "Changepoint here?", "Smoothing the noise", "Trend's emerging"],
+  spatial: ["Drier over here!", "Wetter here. Hmm.", "Mapping every cell", "Next grid cell..."],
+  skeptic: ["Correlation? Not cause", "Is p < 0.05 enough?", "Show me effect size", "Hmm. Not convinced"],
+  report: ["Citations attached", "Another for the log", "Plain words only", "Filing it neatly"],
+};
+
+const GREETINGS: Record<AgentId, string> = {
+  data: "Hi! I fetch NASA data",
+  stats: "Hey! I do the math",
+  trend: "Hi! I find trends",
+  spatial: "Hi! I map the change",
+  skeptic: "Hello. Convince me.",
+  report: "Hi! I write it up",
+};
 
 // ---------------------------------------------------------------- agent rig
 
@@ -303,13 +383,66 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
   // crop rows
   const cropA = mat("#9bcf53");
   const cropB = mat("#e0b23d");
+  const crops: THREE.Mesh[] = [];
   for (let r = 0; r < 3; r++) {
     box(0.5, 0.05, 2.6, mat("#6b4428"), -3.2 + r * 0.7, 0.02, 1.3, world);
     for (let c = 0; c < 5; c++) {
       const h = 0.2 + ((r * 5 + c) % 3) * 0.08;
-      box(0.22, h, 0.22, (r + c) % 2 ? cropA : cropB, -3.2 + r * 0.7, h / 2 + 0.04, 0.3 + c * 0.5, world);
+      const crop = box(0.22, h, 0.22, (r + c) % 2 ? cropA : cropB, -3.2 + r * 0.7, 0.04, 0.3 + c * 0.5, world);
+      crop.geometry.translate(0, h / 2, 0);
+      crops.push(crop);
     }
   }
+
+  // --- pond + waterfall off the front edge
+  const rock = mat("#9a9486");
+  box(1.9, 0.12, 0.2, rock, 2.0, 0.06, 4.85, world);
+  box(0.2, 0.12, 1.2, rock, 1.05, 0.06, 5.4, world);
+  box(0.2, 0.12, 1.2, rock, 2.95, 0.06, 5.4, world);
+  const water = box(1.7, 0.07, 1.1, mat("#3b8fd6", "#1e5aa0", 0.35), 2.0, 0.035, 5.45, world);
+  water.castShadow = false;
+  const streakCanvas = document.createElement("canvas");
+  streakCanvas.width = 64;
+  streakCanvas.height = 256;
+  const streakCtx = streakCanvas.getContext("2d")!;
+  streakCtx.fillStyle = "#5fb4f0";
+  streakCtx.fillRect(0, 0, 64, 256);
+  for (let i = 0; i < 70; i++) {
+    streakCtx.fillStyle = `rgba(255,255,255,${0.25 + Math.random() * 0.6})`;
+    streakCtx.fillRect(Math.floor(Math.random() * 64), Math.random() * 256, 2, 18 + Math.random() * 50);
+  }
+  const streakTex = new THREE.CanvasTexture(streakCanvas);
+  streakTex.colorSpace = THREE.SRGBColorSpace;
+  streakTex.wrapS = streakTex.wrapT = THREE.RepeatWrapping;
+  streakTex.repeat.set(1, 2.5);
+  const fadeCanvas = document.createElement("canvas");
+  fadeCanvas.width = 4;
+  fadeCanvas.height = 64;
+  const fadeCtx = fadeCanvas.getContext("2d")!;
+  const fade = fadeCtx.createLinearGradient(0, 0, 0, 64);
+  fade.addColorStop(0, "#ffffff");
+  fade.addColorStop(0.55, "#aaaaaa");
+  fade.addColorStop(1, "#000000");
+  fadeCtx.fillStyle = fade;
+  fadeCtx.fillRect(0, 0, 4, 64);
+  const waterfall = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.1, 5.5),
+    new THREE.MeshBasicMaterial({
+      map: streakTex,
+      alphaMap: new THREE.CanvasTexture(fadeCanvas),
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  waterfall.position.set(2.0, 0.07 - 2.75, 6.04);
+  world.add(waterfall);
+  const fish = new THREE.Group();
+  box(0.2, 0.11, 0.08, mat("#f08a3e"), 0, 0, 0, fish);
+  box(0.08, 0.12, 0.03, mat("#f6b26b"), -0.13, 0, 0, fish);
+  fish.visible = false;
+  world.add(fish);
+  let fishTimer = 3;
 
   // --- satellite dish
   const dish = new THREE.Group();
@@ -539,6 +672,65 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
     return g;
   });
 
+  // A rain cloud that parks over the crops now and then, so the spatial
+  // agent has some soil moisture to measure.
+  const rainCloudMat = new THREE.MeshLambertMaterial({ color: "#f2f4f8", transparent: true, opacity: 0.95 });
+  const rainCloud = new THREE.Group();
+  box(1.8, 0.55, 1.2, rainCloudMat, 0, 0, 0, rainCloud);
+  box(1.1, 0.5, 0.9, rainCloudMat, 0.5, 0.35, 0.1, rainCloud);
+  box(0.9, 0.45, 0.9, rainCloudMat, -0.6, 0.2, -0.15, rainCloud);
+  rainCloud.children.forEach((c) => (c.castShadow = false));
+  rainCloud.position.set(-2.5, 4.3, 1.3);
+  world.add(rainCloud);
+  const RAIN_DROPS = 60;
+  const rainPos = new Float32Array(RAIN_DROPS * 6);
+  const rainGeo = new THREE.BufferGeometry();
+  rainGeo.setAttribute("position", new THREE.BufferAttribute(rainPos, 3));
+  const rainMat = new THREE.LineBasicMaterial({ color: "#7cc4ff", transparent: true, opacity: 0 });
+  const rain = new THREE.LineSegments(rainGeo, rainMat);
+  rain.frustumCulled = false;
+  world.add(rain);
+  const resetDrop = (i: number, top: boolean) => {
+    const x = -3.6 + Math.random() * 2.2;
+    const z = 0.1 + Math.random() * 2.4;
+    const y = top ? 4.0 : Math.random() * 4;
+    rainPos.set([x, y, z, x, y - 0.3, z], i * 6);
+  };
+  for (let i = 0; i < RAIN_DROPS; i++) resetDrop(i, false);
+  let rainClock = 4;
+  let raining = false;
+  let wetness = 0;
+
+  // --- glow behind the island + fireflies (night) / pollen (day)
+  const glowTex = makeGlowTexture();
+  const halo = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: glowTex, color: "#38bdf8", transparent: true, opacity: 0.25, depthWrite: false }),
+  );
+  // Kept small enough to fade out inside the canvas, and parked behind the
+  // island along the view direction (see placeCamera).
+  halo.scale.set(22, 13, 1);
+  halo.renderOrder = -1;
+  scene.add(halo);
+  const FLIES = 70;
+  const flyBase = new Float32Array(FLIES * 3);
+  const flyPos = new Float32Array(FLIES * 3);
+  for (let i = 0; i < FLIES; i++) {
+    flyBase.set([-6 + Math.random() * 12, 0.3 + Math.random() * 3, -6 + Math.random() * 12], i * 3);
+  }
+  const flyGeo = new THREE.BufferGeometry();
+  flyGeo.setAttribute("position", new THREE.BufferAttribute(flyPos, 3));
+  const flyMat = new THREE.PointsMaterial({
+    map: glowTex,
+    color: "#fde68a",
+    size: 9,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const flies = new THREE.Points(flyGeo, flyMat);
+  flies.frustumCulled = false;
+  world.add(flies);
+
   // --- effects: data packets + ripples
   interface Fx {
     mesh: THREE.Mesh;
@@ -640,6 +832,98 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
   selectRing.visible = false;
   world.add(selectRing);
   let selected: AgentId | null = null;
+  let hovered: AgentId | null = null;
+  const wave: Record<AgentId, number> = { data: 0, stats: 0, trend: 0, spatial: 0, skeptic: 0, report: 0 };
+
+  // Speech bubbles
+  type Bubble = ReturnType<typeof makeCanvasSprite> & { timer: number; age: number };
+  const bubbles = Object.fromEntries(
+    AGENTS.map((a) => {
+      const b = makeCanvasSprite(384, 112, () => {}, 2.5);
+      b.sprite.position.y = 3.0;
+      b.sprite.visible = false;
+      b.sprite.renderOrder = 11;
+      rigs[a.id].root.add(b.sprite);
+      return [a.id, { ...b, timer: 0, age: 0 }];
+    }),
+  ) as Record<AgentId, Bubble>;
+  function say(id: AgentId, text: string, duration = 2.8) {
+    const b = bubbles[id];
+    b.redraw((c) => drawBubble(c, text, AGENT_BY_ID[id].color));
+    b.timer = duration;
+    b.age = 0;
+  }
+  let chatterTimer = 2.5;
+
+  // The investigation orb: carries one topic through the pipeline, agent to agent.
+  const orb = new THREE.Group();
+  orb.visible = false;
+  world.add(orb);
+  const orbCore = new THREE.Mesh(new THREE.IcosahedronGeometry(0.17, 0), new THREE.MeshBasicMaterial({ color: "#ffffff" }));
+  orb.add(orbCore);
+  const orbGlowMat = new THREE.SpriteMaterial({
+    map: glowTex,
+    color: "#38bdf8",
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const orbGlow = new THREE.Sprite(orbGlowMat);
+  orbGlow.scale.setScalar(1.4);
+  orb.add(orbGlow);
+  const orbRingMat = new THREE.MeshBasicMaterial({ color: "#38bdf8" });
+  const orbRing = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.025, 4, 32), orbRingMat);
+  orb.add(orbRing);
+  const TRAIL = 16;
+  const trailMats: THREE.SpriteMaterial[] = [];
+  const trail = Array.from({ length: TRAIL }, (_, i) => {
+    const m = new THREE.SpriteMaterial({
+      map: glowTex,
+      color: "#38bdf8",
+      transparent: true,
+      opacity: 0.8 * (1 - i / TRAIL),
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    trailMats.push(m);
+    const sp = new THREE.Sprite(m);
+    sp.scale.setScalar(0.55 * (1 - i / TRAIL) + 0.08);
+    sp.visible = false;
+    world.add(sp);
+    return sp;
+  });
+  const trailPts: THREE.Vector3[] = [];
+  const inv = {
+    active: false,
+    stage: 0,
+    phase: "dwell" as "hop" | "dwell",
+    timer: 0,
+    from: new THREE.Vector3(),
+    topic: "",
+    topicIdx: Math.floor(Math.random() * INVESTIGATION_TOPICS.length),
+  };
+  const HOP = 1.1;
+  const DWELL = 2.0;
+  const orbTarget = new THREE.Vector3();
+
+  // Confetti for filed findings
+  const confettiGeo = new THREE.BoxGeometry(0.09, 0.09, 0.09);
+  const confettiMats = ["#e34948", "#eda100", "#1baf7a", "#38bdf8", "#a78bfa", "#e87ba4"].map(
+    (c) => new THREE.MeshBasicMaterial({ color: c }),
+  );
+  const confetti: { mesh: THREE.Mesh; vel: THREE.Vector3; life: number }[] = [];
+  function burst(x: number, y: number, z: number) {
+    for (let i = 0; i < 40; i++) {
+      const m = new THREE.Mesh(confettiGeo, confettiMats[i % confettiMats.length]);
+      m.position.set(x, y, z);
+      world.add(m);
+      confetti.push({
+        mesh: m,
+        vel: new THREE.Vector3((Math.random() - 0.5) * 3.5, 3 + Math.random() * 3.5, (Math.random() - 0.5) * 3.5),
+        life: 1,
+      });
+    }
+  }
 
   // ---------------------------------------------------------------- behaviours
 
@@ -676,7 +960,7 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
     { x: 1.8, z: 2.0 },
   ];
 
-  let pendingReports = 0;
+  const reportQueue: string[] = [];
 
   const dataBot = { state: "toDish" as "toDish" | "load" | "toTerm" | "drop", timer: 0 };
   function updateData(dt: number) {
@@ -723,7 +1007,7 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
           dataCube.visible = false;
           screenFlash = 0.4;
           barBump = 1;
-          pendingReports = Math.min(pendingReports + 1, 3);
+          startInvestigation();
           screenSeries.push(Math.min(1, screenSeries[screenSeries.length - 1] + (Math.random() - 0.35) * 0.12));
           screenSeries.shift();
           drawScreen();
@@ -863,14 +1147,14 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
       pose(rig, { armL: -1.1, armR: -0.9, headX: 0.35 + Math.sin(t * 1.5) * 0.05 }, dt);
     } else {
       status.skeptic = "Not convinced. Is the effect big enough to matter?";
-      doubt.sprite.visible = true;
+      doubt.sprite.visible = bubbles.skeptic.timer <= 0;
       doubt.sprite.position.y = 2.6 + Math.sin(t * 6) * 0.06;
       face(rig, Math.PI / 4, dt);
       pose(rig, { armL: -1.4, armR: -1.4, armLz: -0.9, armRz: 0.9, headY: Math.sin(t * 9) * 0.45 }, dt);
     }
   }
 
-  const reportBot = { state: "wait" as "wait" | "pick" | "toArchive" | "file" | "back", timer: 0 };
+  const reportBot = { state: "wait" as "wait" | "pick" | "toArchive" | "file" | "back", timer: 0, topic: "" };
   function updateReport(dt: number, t: number) {
     const rig = rigs.report;
     switch (reportBot.state) {
@@ -878,8 +1162,8 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
         status.report = "Waiting for a checked result to file";
         face(rig, Math.PI, dt);
         pose(rig, { headY: Math.sin(t * 0.7) * 0.5 }, dt);
-        if (pendingReports > 0) {
-          pendingReports -= 1;
+        if (reportQueue.length > 0) {
+          reportBot.topic = reportQueue.shift()!;
           reportBot.state = "pick";
           reportBot.timer = 0;
           printedPaper.visible = true;
@@ -916,6 +1200,9 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
           heldPaper.visible = false;
           bumpCounter();
           spawnRipple(-1.6, 4.0, "#a78bfa");
+          burst(-1.6, 1.4, 4.4);
+          say("report", "Finding filed!");
+          opts.onFinding?.(reportBot.topic, findingsCount);
         }
         if (reportBot.timer > 0.9) reportBot.state = "back";
         break;
@@ -928,12 +1215,121 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
     }
   }
 
+  // ---------------------------------------------------------------- investigation orb
+
+  function dwellPos(stage: number, t: number, out: THREE.Vector3): THREE.Vector3 {
+    if (stage === PIPELINE_STAGES.length - 1) return out.set(2.6, 0.75, -4.0);
+    if (stage === 0) out.set(0.5, 3.1, -4.1);
+    else {
+      const p = rigs[PIPELINE_STAGES[stage]].root.position;
+      out.set(p.x, 3.75, p.z);
+    }
+    out.x += Math.cos(t * 3) * 0.35;
+    out.z += Math.sin(t * 3) * 0.35;
+    out.y += Math.sin(t * 4) * 0.08;
+    return out;
+  }
+
+  function setOrbColor(color: string) {
+    orbGlowMat.color.set(color);
+    orbRingMat.color.set(color);
+    trailMats.forEach((m) => m.color.set(color));
+  }
+
+  function startInvestigation() {
+    if (inv.active) return;
+    inv.active = true;
+    inv.stage = 0;
+    inv.phase = "dwell";
+    inv.timer = 0;
+    inv.topic = INVESTIGATION_TOPICS[inv.topicIdx++ % INVESTIGATION_TOPICS.length];
+    orb.visible = true;
+    orb.scale.setScalar(0.01);
+    dwellPos(0, simTime, orb.position);
+    trailPts.length = 0;
+    arrive(0);
+  }
+
+  function arrive(stage: number) {
+    const id = PIPELINE_STAGES[stage];
+    const color = AGENT_BY_ID[id].color;
+    setOrbColor(color);
+    opts.onStage?.(stage, inv.topic);
+    say(id, ARRIVE_LINES[id]);
+    if (stage > 0 && stage < PIPELINE_STAGES.length - 1) {
+      const p = rigs[id].root.position;
+      spawnRipple(p.x, p.z, color);
+    }
+    if (id === "stats") {
+      barBump = 1;
+      screenFlash = 0.6;
+    } else if (id === "skeptic") {
+      skepticTimer = Math.floor(skepticTimer / 7.5) * 7.5 + 4.5;
+    } else if (id === "report") {
+      spawnRipple(2.6, -3.5, color);
+      if (reportQueue.length < 3) reportQueue.push(inv.topic);
+    }
+  }
+
+  function updateOrb(dt: number, t: number) {
+    if (!inv.active) return;
+    inv.timer += dt;
+    const last = PIPELINE_STAGES.length - 1;
+    if (inv.phase === "hop") {
+      const k = Math.min(1, inv.timer / HOP);
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      dwellPos(inv.stage, t, orbTarget);
+      orb.position.lerpVectors(inv.from, orbTarget, e);
+      orb.position.y += Math.sin(Math.PI * k) * 1.6;
+      if (k >= 1) {
+        inv.phase = "dwell";
+        inv.timer = 0;
+        arrive(inv.stage);
+      }
+    } else if (inv.stage === last) {
+      // Dive into the printer and vanish.
+      dwellPos(last, t, orb.position);
+      orb.scale.setScalar(Math.max(0.01, 1 - inv.timer / 0.6));
+      if (inv.timer > 0.8) {
+        inv.active = false;
+        orb.visible = false;
+      }
+    } else {
+      orb.scale.setScalar(damp(orb.scale.x, 1, 6, dt));
+      dwellPos(inv.stage, t, orb.position);
+      if (inv.timer > (inv.stage === 0 ? 1.6 : DWELL)) {
+        inv.from.copy(orb.position);
+        inv.stage += 1;
+        inv.phase = "hop";
+        inv.timer = 0;
+      }
+    }
+    orbCore.rotation.x += dt * 2;
+    orbCore.rotation.y += dt * 3;
+    orbRing.rotation.x = t * 2;
+    orbRing.rotation.y = t * 1.3;
+  }
+
+  function updateTrail() {
+    if (orb.visible) {
+      const p = trailPts.length >= TRAIL ? trailPts.pop()! : new THREE.Vector3();
+      trailPts.unshift(p.copy(orb.position));
+    } else if (trailPts.length) trailPts.pop();
+    trail.forEach((sp, i) => {
+      const p = trailPts[i];
+      sp.visible = !!p;
+      if (p) sp.position.copy(p);
+    });
+  }
+
   // ---------------------------------------------------------------- world tick
 
   const satPos = new THREE.Vector3();
   const receiverPos = new THREE.Vector3();
   let packetTimer = 0;
   let screenTimer = 0;
+  const RAIN_GREY = new THREE.Color("#8d97aa");
+  const CLOUD_WHITE = new THREE.Color("#f2f4f8");
 
   function update(dt: number, t: number) {
     world.position.y = Math.sin(t * 0.6) * 0.08;
@@ -996,12 +1392,116 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
     });
     trees.forEach((tr, i) => (tr.rotation.z = Math.sin(t * 1.2 + i) * 0.02));
 
+    // waterfall + jumping fish
+    streakTex.offset.y += dt * 1.4;
+    fishTimer -= dt;
+    if (fishTimer <= 0) {
+      const k = Math.min(1, -fishTimer / 0.9);
+      fish.visible = true;
+      fish.position.set(1.6 + k * 0.8, 0.05 + Math.sin(Math.PI * k) * 0.75, 5.4);
+      fish.rotation.z = Math.cos(Math.PI * k) * 1.1;
+      if (k >= 1) {
+        fish.visible = false;
+        fishTimer = 5 + Math.random() * 4;
+        spawnRipple(2.4, 5.4, "#bfe6ff");
+      } else if (fishTimer > -dt) spawnRipple(1.6, 5.4, "#bfe6ff");
+    }
+
+    // rain over the crops
+    rainClock -= dt;
+    if (rainClock <= 0) {
+      raining = !raining;
+      rainClock = raining ? 5 : 11 + Math.random() * 6;
+      if (raining) say("spatial", "Rain! Soil's wetter");
+    }
+    rainMat.opacity = damp(rainMat.opacity, raining ? 0.85 : 0, 3, dt);
+    rainCloudMat.color.lerp(raining ? RAIN_GREY : CLOUD_WHITE, Math.min(1, dt * 2));
+    rainCloud.position.x = -2.5 + Math.sin(t * 0.3) * 0.3;
+    if (rainMat.opacity > 0.01) {
+      for (let i = 0; i < RAIN_DROPS; i++) {
+        const o = i * 6;
+        rainPos[o + 1] -= dt * 7;
+        rainPos[o + 4] -= dt * 7;
+        if (rainPos[o + 4] < 0.05) {
+          if (raining) resetDrop(i, true);
+          else rainPos[o + 1] = rainPos[o + 4] = -10;
+        }
+      }
+      rainGeo.attributes.position.needsUpdate = true;
+    }
+    wetness = raining ? Math.min(1, wetness + dt * 0.25) : Math.max(0, wetness - dt * 0.04);
+    crops.forEach((c, i) => (c.scale.y = 1 + wetness * (0.35 + (i % 3) * 0.12)));
+
+    // fireflies / pollen
+    for (let i = 0; i < FLIES; i++) {
+      const o = i * 3;
+      flyPos[o] = flyBase[o] + Math.sin(t * 0.5 + i) * 0.5;
+      flyPos[o + 1] = flyBase[o + 1] + Math.sin(t * 1.3 + i * 1.7) * 0.3;
+      flyPos[o + 2] = flyBase[o + 2] + Math.cos(t * 0.4 + i * 0.7) * 0.5;
+    }
+    flyGeo.attributes.position.needsUpdate = true;
+
     updateData(dt);
     updateStats(dt, t);
     updateTrend(dt, t);
     updateSpatial(dt);
     updateSkeptic(dt, t);
     updateReport(dt, t);
+    updateOrb(dt, t);
+    updateTrail();
+
+    // waving (click greeting), hover lift, speech bubbles, chatter
+    for (const a of AGENTS) {
+      const rig = rigs[a.id];
+      if (wave[a.id] > 0) {
+        wave[a.id] -= dt;
+        rig.armR.rotation.x = -2.8;
+        rig.armR.rotation.z = 0.3 + Math.sin(t * 16) * 0.35;
+        rig.head.rotation.z = Math.sin(t * 8) * 0.12;
+      } else rig.head.rotation.z = damp(rig.head.rotation.z, 0, 8, dt);
+      const lift = a.id === hovered || a.id === selected ? 1.12 : 1;
+      rig.root.scale.setScalar(damp(rig.root.scale.x, lift, 10, dt));
+
+      const b = bubbles[a.id];
+      if (b.timer > 0) {
+        b.timer -= dt;
+        b.age += dt;
+        const pop = Math.min(1, b.age * 7);
+        const shrink = Math.min(1, b.timer * 6);
+        const s = 2.5 * Math.min(pop * (1 + 0.15 * Math.sin(pop * Math.PI)), shrink);
+        b.sprite.scale.set(s, (s * 112) / 384, 1);
+        b.sprite.visible = s > 0.01;
+      } else b.sprite.visible = false;
+    }
+    chatterTimer -= dt;
+    if (chatterTimer <= 0) {
+      chatterTimer = 3 + Math.random() * 3;
+      const quiet = AGENTS.filter((a) => bubbles[a.id].timer <= 0);
+      if (quiet.length) {
+        const a = quiet[Math.floor(Math.random() * quiet.length)];
+        const lines = CHATTER[a.id];
+        say(a.id, lines[Math.floor(Math.random() * lines.length)], 2.4);
+      }
+    }
+
+    for (let i = confetti.length - 1; i >= 0; i--) {
+      const c = confetti[i];
+      c.life -= dt / 1.8;
+      if (c.life <= 0) {
+        world.remove(c.mesh);
+        confetti.splice(i, 1);
+        continue;
+      }
+      c.vel.y -= 9.8 * dt;
+      c.mesh.position.addScaledVector(c.vel, dt);
+      if (c.mesh.position.y < 0.05) {
+        c.mesh.position.y = 0.05;
+        c.vel.set(0, 0, 0);
+      }
+      c.mesh.rotation.x += dt * 8;
+      c.mesh.rotation.y += dt * 6;
+      c.mesh.scale.setScalar(Math.min(1, c.life * 3));
+    }
 
     if (selected) {
       const r = rigs[selected].root.position;
@@ -1015,6 +1515,7 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
 
   function applyTheme() {
     const light = document.documentElement.getAttribute("data-theme") === "light";
+    [flyMat, orbGlowMat, ...trailMats].forEach((m) => (m.needsUpdate = true));
     if (light) {
       hemi.color.set("#fff6dc");
       hemi.groundColor.set("#8a6a3c");
@@ -1023,6 +1524,13 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
       sun.intensity = 2.2;
       screenLight.intensity = 0;
       cloudMat.opacity = 0.95;
+      halo.material.color.set("#fff3c4");
+      halo.material.opacity = 0.55;
+      flyMat.color.set("#ffffff");
+      flyMat.blending = THREE.NormalBlending;
+      flyMat.opacity = 0.7;
+      orbGlowMat.blending = THREE.NormalBlending;
+      trailMats.forEach((m) => (m.blending = THREE.NormalBlending));
     } else {
       hemi.color.set("#7d93d6");
       hemi.groundColor.set("#1a1f33");
@@ -1031,6 +1539,13 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
       sun.intensity = 1.3;
       screenLight.intensity = 6;
       cloudMat.opacity = 0.35;
+      halo.material.color.set("#38bdf8");
+      halo.material.opacity = 0.22;
+      flyMat.color.set("#fde68a");
+      flyMat.blending = THREE.AdditiveBlending;
+      flyMat.opacity = 0.95;
+      orbGlowMat.blending = THREE.AdditiveBlending;
+      trailMats.forEach((m) => (m.blending = THREE.AdditiveBlending));
     }
   }
   applyTheme();
@@ -1045,6 +1560,8 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
   let userAz = 0;
   let pointerAz = 0;
   let autoAz = 0;
+  // Zoom-and-swing intro on first load (skipped for reduced motion).
+  let intro = reducedMotion ? 1 : 0;
   // World units that must stay in frame: the island is ~17 wide on screen,
   // so the narrow limit crops the far corners slightly on phones.
   const VIEW_W = 16.5;
@@ -1069,9 +1586,17 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
     camera.updateProjectionMatrix();
   }
   function placeCamera() {
-    const az = Math.PI / 4 + autoAz + userAz + pointerAz;
+    const e = 1 - Math.pow(1 - Math.min(1, Math.max(0, intro)), 3);
+    const az = Math.PI / 4 + autoAz + userAz + pointerAz + (1 - e) * 1.1;
+    const zoom = 0.55 + 0.45 * e;
+    if (camera.zoom !== zoom) {
+      camera.zoom = zoom;
+      camera.updateProjectionMatrix();
+    }
     camera.position.set(Math.sin(az) * 18, 10.4, Math.cos(az) * 18);
     camera.lookAt(0, 0.6, 0);
+    halo.position.copy(camera.position).normalize().multiplyScalar(-14);
+    halo.position.y += 0.6;
   }
 
   const raycaster = new THREE.Raycaster();
@@ -1111,7 +1636,8 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
     } else if (e.pointerType === "mouse") {
       pointerAz = (((e.clientX - rect.left) / rect.width) * 2 - 1) * -0.06;
     }
-    renderer.domElement.style.cursor = dragging && Math.abs(e.clientX - dragStartX) > 4 ? "grabbing" : agentAt(e) ? "pointer" : "grab";
+    hovered = e.pointerType === "mouse" ? agentAt(e) : null;
+    renderer.domElement.style.cursor = dragging && Math.abs(e.clientX - dragStartX) > 4 ? "grabbing" : hovered ? "pointer" : "grab";
   };
   const onUp = (e: PointerEvent) => {
     const wasClick = Math.abs(e.clientX - dragStartX) < 5;
@@ -1121,6 +1647,7 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
   const onLeave = () => {
     dragging = false;
     pointerAz = 0;
+    hovered = null;
   };
   renderer.domElement.addEventListener("pointerdown", onDown);
   renderer.domElement.addEventListener("pointermove", onMove);
@@ -1129,6 +1656,10 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
 
   function setSelected(id: AgentId | null, notify: boolean) {
     selected = id;
+    if (id) {
+      wave[id] = 1.6;
+      say(id, GREETINGS[id]);
+    }
     if (reducedMotion) {
       update(0, simTime);
       render();
@@ -1149,10 +1680,13 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
 
   function tick(now: number) {
     raf = requestAnimationFrame(tick);
-    const dt = Math.min(0.05, (now - last) / 1000);
+    // rAF timestamps can predate the performance.now() taken in start(), so
+    // the first delta may be slightly negative.
+    const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
     last = now;
     simTime += dt;
     autoAz = Math.sin(simTime * 0.08) * 0.3;
+    if (intro < 1) intro = Math.min(1, intro + dt / 2.8);
     update(dt, simTime);
     placeCamera();
     render();
@@ -1221,8 +1755,9 @@ export function createDiorama(container: HTMLDivElement, opts: DioramaOptions): 
         m.dispose();
       });
       geos.forEach((g) => g.dispose());
-      [packetGeo, rippleGeo].forEach((g) => g.dispose());
-      packetMat.dispose();
+      [packetGeo, rippleGeo, confettiGeo].forEach((g) => g.dispose());
+      [packetMat, ...confettiMats].forEach((m) => m.dispose());
+      glowTex.dispose();
       matCache.clear();
       renderer.dispose();
       renderer.domElement.remove();

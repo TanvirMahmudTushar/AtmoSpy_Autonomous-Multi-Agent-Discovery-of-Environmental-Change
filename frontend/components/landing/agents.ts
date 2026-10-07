@@ -57,3 +57,22 @@ export const AGENTS: AgentMeta[] = [
 ];
 
 export const AGENT_BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a])) as Record<AgentId, AgentMeta>;
+
+/** Order an investigation moves through the crew in the diorama. */
+export const PIPELINE_STAGES: AgentId[] = ["data", "stats", "trend", "spatial", "skeptic", "report"];
+
+/** Topics the diorama's "live investigation" cycles through. These are real
+ * region/variable pairs from the Discover scan (backend/app/nasa/regions.py
+ * DISCOVERY_CANDIDATES), shown without numbers because nothing is computed. */
+export const INVESTIGATION_TOPICS = [
+  "Soil moisture · Indo-Gangetic Plain",
+  "Temperature · Tibetan Plateau",
+  "Rainfall · West Sahel",
+  "Soil moisture · California Central Valley",
+  "Temperature · Arctic Alaska North Slope",
+  "Rainfall · Central Amazon Basin",
+  "Soil moisture · Lake Chad Basin",
+  "Temperature · Bangladesh",
+  "Soil moisture · Murray-Darling Basin",
+  "Temperature · Southern Greenland",
+];
