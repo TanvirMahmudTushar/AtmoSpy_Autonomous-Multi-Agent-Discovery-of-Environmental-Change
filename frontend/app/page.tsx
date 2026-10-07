@@ -18,7 +18,7 @@ const PIPELINE = [
   { icon: "telescope", label: "Discover", desc: "Scan NASA data for candidate trends" },
   { icon: "compass", label: "Investigate", desc: "Plan and run the right analysis" },
   { icon: "mountain", label: "Analyze", desc: "Deterministic trend + significance tests" },
-  { icon: "cloud", label: "Visualize", desc: "Charts and maps of real results" },
+  { icon: "chart", label: "Visualize", desc: "Charts and maps of real results" },
   { icon: "notebook", label: "Understand", desc: "Plain-language, guarded interpretation" },
   { icon: "star", label: "Record", desc: "Saved as a scientific finding" },
 ];
