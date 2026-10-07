@@ -4,6 +4,7 @@ import { TileSprite } from "@/components/pixel/TileSprite";
 import { Logo } from "@/components/layout/Logo";
 import { HeroAuthCTA } from "@/components/layout/HeroAuthCTA";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { AgentDiorama } from "@/components/landing/AgentDiorama";
 
 const QUESTION_EXAMPLES = [
   "Find significant changes in soil moisture in South Asia since 2005.",
@@ -71,6 +72,18 @@ export default function LandingPage() {
           </div>
         </div>
       </div>
+
+      <section className="mx-auto max-w-6xl px-4 pt-16 sm:pt-20">
+        <div className="mb-2 text-center">
+          <h2 className="font-display text-[12px] leading-relaxed text-[var(--app-ink)] sm:text-[14px]">
+            Meet the crew
+          </h2>
+          <p className="mt-2 text-sm text-[var(--app-ink-soft)]">
+            Six agents, one investigation. Here&apos;s what each of them is doing right now.
+          </p>
+        </div>
+        <AgentDiorama />
+      </section>
 
       <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20">
         <div className="mt-0 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">

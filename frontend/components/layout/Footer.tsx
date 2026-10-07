@@ -14,7 +14,7 @@ export function Footer() {
           View the source on GitHub
         </a>
         <p className="text-[11px] text-[var(--app-muted)]">
-          Built for NASA Space Apps Challenge 2026. Not an official NASA product.
+          Built by Tanvir Mahmud Tushar 
         </p>
       </div>
     </footer>
