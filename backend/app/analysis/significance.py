@@ -11,9 +11,11 @@ def classify_significance(p_value: float, alpha: float = ALPHA) -> str:
 
 
 def effect_size(total_change: float, std_dev: float) -> float:
-    """|total change| / std. dev. of the annual series (a Cohen's-d-style ratio).
-    Persisted on each Finding so views without the full series (Discover cards,
-    the globe) can still size a visual to the change.
+    """|total change| / year-to-year variability (a Cohen's-d-style ratio). The
+    variability is the SD of the annual means after removing the trend, so a
+    strong trend doesn't inflate its own yardstick. Persisted on each Finding
+    so views without the full series (Discover cards, the globe) can still
+    size a visual to the change.
     """
     if std_dev == 0:
         return 0.0

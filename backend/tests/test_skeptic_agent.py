@@ -40,7 +40,7 @@ def test_short_series_raises_sample_size_objection():
     values = [10 + 0.5 * i for i in range(len(years))]
     state = _base_state(years, values)
     points = _build_skeptic_points(state)
-    assert any("annual points" in p for p in points)
+    assert any("years of data" in p for p in points)
 
 
 def test_low_completeness_raises_objection():

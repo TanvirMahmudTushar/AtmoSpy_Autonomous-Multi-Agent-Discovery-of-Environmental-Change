@@ -129,7 +129,9 @@ export const api = {
 
   guestLogin: () => request<AuthResponse>("/api/auth/guest", { method: "POST" }),
 
-  me: () => request<User>("/api/auth/me"),
+  // Time-boxed so a hung backend fails fast into AuthContext's retry loop
+  // instead of leaving the session check pending indefinitely.
+  me: () => request<User>("/api/auth/me", { signal: AbortSignal.timeout(15000) }),
 
   listWatches: () => request<Watch[]>("/api/watches"),
   createWatch: (region_code: string, variable_code: string, frequency_days: number) =>

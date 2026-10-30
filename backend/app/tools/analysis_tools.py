@@ -3,25 +3,24 @@ Agents call. Every function is a deterministic computation — no LLM
 involvement, matching the spec's "LLM must not invent numbers" rule.
 """
 
-import pandas as pd
-
-from app.analysis import changepoint, correlation, quality, significance, spatial, trend
+from app.analysis import changepoint, correlation, detectability, quality, significance, spatial, timeseries, trend
 from app.nasa.base import GridSeries, PointSeries
 
 
+def prepare_monthly(series: PointSeries) -> timeseries.MonthlyBundle:
+    """Native samples -> monthly means -> climatology -> anomalies -> annual."""
+    return timeseries.prepare(series.dates, series.values)
+
+
 def calculate_time_series(point_series: PointSeries, freq: str = "annual") -> tuple[list[int], list[float]]:
-    """Aggregates a daily (or monthly) point series to annual means using
-    pandas — the standard way to remove seasonal noise before trend testing.
-    """
+    """Annual means built from monthly means (see timeseries.to_annual), so a
+    year missing a seasonally extreme month isn't biased."""
+    if freq != "annual":
+        raise ValueError(f"Unsupported frequency: {freq}")
     if not point_series.dates:
         return [], []
-    s = pd.Series(point_series.values, index=pd.to_datetime(point_series.dates))
-    if freq == "annual":
-        annual = s.resample("YE").mean().dropna()
-        years = [ts.year for ts in annual.index]
-        values = [float(v) for v in annual.values]
-        return years, values
-    raise ValueError(f"Unsupported frequency: {freq}")
+    annual = prepare_monthly(point_series).annual
+    return [int(y) for y in annual.index], [float(v) for v in annual.values]
 
 
 def validate_dataset(point_series: PointSeries, requested_start, requested_end, valid_min=None, valid_max=None):
@@ -37,11 +36,32 @@ def validate_dataset(point_series: PointSeries, requested_start, requested_end, 
 
 
 def calculate_trend(years: list[int], values: list[float]):
+    """Annual-basis trend (used for cross-checks and annual-only sources)."""
     return trend.compute_trend(years, values)
 
 
-def calculate_trend_band(years: list[int], values: list[float], trend_result) -> list[dict]:
-    return trend.bootstrap_trend_band(years, values, trend_result)
+def calculate_primary_trend(bundle: timeseries.MonthlyBundle):
+    return trend.primary_trend(bundle)
+
+
+def calculate_seasonal_trends(bundle: timeseries.MonthlyBundle, min_years: int = 10) -> list[dict]:
+    """Trend of each season's mean anomaly. Seasons often change at different
+    rates (e.g. winters warming faster than summers)."""
+    out = []
+    for season in timeseries.SEASONS:
+        s = timeseries.seasonal_means(bundle.anomalies.dropna(), season)
+        if len(s) < min_years:
+            continue
+        t = trend.compute_trend(list(s.index), list(s.values))
+        out.append({
+            "season": season,
+            "n_years": t.n_years,
+            "slope_per_year": t.sen_slope_per_year,
+            "slope_per_decade": t.slope_per_decade,
+            "p_value": t.mk_p_value,
+            "significant": t.mk_p_value < significance.ALPHA,
+        })
+    return out
 
 
 def calculate_change_rate(trend_result) -> dict:
@@ -56,17 +76,34 @@ def detect_change_points(years: list[int], values: list[float]) -> list[dict]:
     return changepoint.detect_change_points(years, values)
 
 
-def calculate_statistical_significance(trend_result, alpha: float = 0.05) -> dict:
+def calculate_statistical_significance(trend_result, alpha: float = significance.ALPHA) -> dict:
     return {
         "p_value": trend_result.mk_p_value,
         "classification": significance.classify_significance(trend_result.mk_p_value, alpha),
         "alpha": alpha,
-        "method": "mann_kendall",
+        "method": trend_result.primary_method,
+        "basis": trend_result.basis,
+        "t_test": {
+            "p_value": trend_result.ols_p_value,
+            "t_statistic": trend_result.ols_t,
+            "n_eff": trend_result.n_eff,
+            "lag1_autocorrelation": trend_result.lag1,
+            "slope_ci": [trend_result.ols_ci_lower, trend_result.ols_ci_upper],
+        },
+        "cross_checks": {
+            "mann_kendall_uncorrected_p": trend_result.mk_p_value_original,
+            "mann_kendall_prewhitened_p": trend_result.mk_p_value_prewhitened,
+            "seasonal_mann_kendall_p": trend_result.seasonal_mk_p_value,
+        },
     }
 
 
-def calculate_confidence_interval(years: list[int], values: list[float], alpha: float = 0.05) -> dict:
-    return trend.sen_slope_confidence_interval(years, values, alpha)
+def calculate_confidence_interval(trend_result, alpha: float = significance.ALPHA) -> dict:
+    return {"lower": trend_result.sen_ci_lower, "upper": trend_result.sen_ci_upper, "confidence": 1 - alpha}
+
+
+def calculate_detectability(trend_result) -> dict:
+    return detectability.assess(trend_result)
 
 
 def calculate_importance_note(trend_result) -> str:
@@ -77,12 +114,12 @@ def calculate_persistence(years: list[int], values: list[float]) -> dict:
     return trend.first_half_second_half_persistence(years, values)
 
 
-def calculate_spatial_trends(grid_series: GridSeries, alpha: float = 0.05):
-    return spatial.compute_cell_trends(grid_series.cells, alpha)
+def calculate_spatial_trends(grid_series: GridSeries):
+    return spatial.compute_cell_trends(grid_series.cells)
 
 
-def detect_opposite_regional_trends(cell_trends, alpha: float = 0.05) -> dict:
-    return spatial.detect_opposite_trends(cell_trends, alpha)
+def detect_opposite_regional_trends(cell_trends) -> dict:
+    return spatial.detect_opposite_trends(cell_trends)
 
 
 def calculate_spatial_timelapse(grid_series: GridSeries) -> dict:

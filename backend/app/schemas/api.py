@@ -116,6 +116,12 @@ class FindingDetailOut(FindingSummaryOut):
     visualizations: dict
     provenance: dict | None
     insight: dict | None = None
+    # Version 1 findings (annual means, uncorrected tests) leave these empty.
+    analysis_version: int = 1
+    temporal_basis: str = "annual"
+    trend_details: dict | None = None
+    detectability: dict | None = None
+    seasonal_trends: list | None = None
 
 
 class DatasetOut(BaseModel):

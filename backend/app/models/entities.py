@@ -178,11 +178,19 @@ class Finding(Base, UUIDPk, TimestampMixin):
     trend_units: Mapped[str] = mapped_column(String(64))
     total_change: Mapped[float] = mapped_column(Float)
     percent_change: Mapped[float | None] = mapped_column(Float, nullable=True)
-    # |total_change| / std. dev. of the annual series — how big the change is
-    # against the variable's own year-to-year swings (see analysis/significance.py).
+    # |total_change| / year-to-year variability — how big the change is
+    # against the variable's own natural swings (see analysis/significance.py).
     effect_size: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    statistical_method: Mapped[str] = mapped_column(String(128))
+    # 1 = annual means + uncorrected Mann-Kendall; 2 = monthly anomalies +
+    # autocorrelation-corrected tests. Compare findings only within a version.
+    analysis_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    temporal_basis: Mapped[str] = mapped_column(String(24), default="annual", server_default="annual")
+    trend_details: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    detectability: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    seasonal_trends: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+
+    statistical_method: Mapped[str] = mapped_column(Text)
     p_value: Mapped[float] = mapped_column(Float)
     confidence_interval: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     significance_classification: Mapped[str] = mapped_column(String(32))
@@ -287,4 +295,7 @@ class Watch(Base, UUIDPk, TimestampMixin):
     # The check before last_* — kept so the UI can draw "previous vs latest".
     prev_trend_per_year: Mapped[float | None] = mapped_column(Float, nullable=True)
     prev_significance: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Analysis version of the last check (NULL = version 1). A method upgrade
+    # between checks is a new baseline, not a change in the Earth system.
+    last_analysis_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_check_note: Mapped[str | None] = mapped_column(Text, nullable=True)

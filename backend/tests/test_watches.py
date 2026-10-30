@@ -10,6 +10,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.agents.watch_runner import _build_note
+from app.analysis.trend import ANALYSIS_VERSION
 from app.main import app
 from app.models import Watch
 
@@ -151,9 +152,17 @@ async def test_two_concurrent_check_now_calls_get_distinct_investigation_ids():
 
 
 def _watch(**overrides) -> Watch:
-    defaults = dict(last_trend_per_year=None, last_significance=None)
+    defaults = dict(last_trend_per_year=None, last_significance=None, last_analysis_version=ANALYSIS_VERSION)
     defaults.update(overrides)
     return Watch(**defaults)
+
+
+def test_build_note_treats_a_method_upgrade_as_a_new_baseline():
+    # A watch last checked under analysis version 1 (NULL in the database).
+    watch = _watch(last_trend_per_year=0.3, last_significance="not_significant", last_analysis_version=None)
+    note = _build_note(watch, new_trend=-0.3, new_significance="statistically_significant")
+    assert "new baseline" in note
+    assert "flipped" not in note
 
 
 def test_build_note_first_check_has_nothing_to_compare():

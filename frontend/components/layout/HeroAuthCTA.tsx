@@ -11,7 +11,7 @@ import { PixelButton, PixelLinkButton } from "@/components/ui/button";
 // entirely; now the landing page's job is purely to get a session started
 // before handing off to /home.
 export function HeroAuthCTA() {
-  const { user, loading, loginAsGuest, error, clearError } = useAuth();
+  const { user, loginAsGuest, error, clearError } = useAuth();
   const router = useRouter();
   const [guestLoading, setGuestLoading] = useState(false);
 
@@ -28,10 +28,9 @@ export function HeroAuthCTA() {
     }
   }
 
-  if (loading) {
-    return <div className="h-[34px] w-72 animate-pulse rounded-sm bg-[var(--app-panel-alt)]" />;
-  }
-
+  // No skeleton while a saved session is being checked: on a cold backend
+  // that check can take a minute, and the buttons work either way. They
+  // swap for the console link once the session resolves.
   if (user) {
     return (
       <PixelLinkButton href="/home" variant="primary" size="sm">

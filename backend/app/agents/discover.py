@@ -16,18 +16,9 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from app.agents import (
-    investigation_agent,
-    nasa_data_agent,
-    quality_agent,
-    relationship_agent,
-    report_agent,
-    skeptic_agent,
-    spatial_agent,
-    statistics_agent,
-    trend_agent,
-)
+from app.agents.orchestrator import run_pipeline
 from app.agents.state import InvestigationState
+from app.analysis.spatial import benjamini_hochberg
 from app.core.config import get_settings
 from app.db.session import AsyncSessionLocal
 from app.llm.planner import InvestigationPlan
@@ -70,25 +61,8 @@ async def _run_candidate(investigation_id: uuid.UUID, region_code: str, variable
             state = InvestigationState(investigation_id=investigation_id, question=None, mode="discover", plan=plan, region=region)
 
             try:
-                await recorder.emit("NASA_DATA_AGENT", "running", f"[{label}] Retrieving NASA POWER data...")
-                state = await nasa_data_agent.run(session, recorder, state)
-                if state.status == "failed":
-                    return None
-
-                state = await quality_agent.run(session, recorder, state)
-                if state.status == "insufficient_data":
-                    return None
-
-                state = await trend_agent.run(session, recorder, state)
-                if state.status == "insufficient_data":
-                    return None
-
-                state = await statistics_agent.run(session, recorder, state)
-                state = await spatial_agent.run(session, recorder, state)
-                state = await relationship_agent.run(session, recorder, state)
-                state = await investigation_agent.run(session, recorder, state)
-                state = await skeptic_agent.run(session, recorder, state)
-                state = await report_agent.run(session, recorder, state)
+                await recorder.emit("NASA_DATA_AGENT", "running", f"[{label}] Retrieving NASA data...")
+                state = await run_pipeline(session, recorder, state, allow_retry=False)
                 return str(state.finding_id) if state.finding_id else None
             except Exception:
                 logger.exception("Discovery candidate %s failed", label)
@@ -96,9 +70,12 @@ async def _run_candidate(investigation_id: uuid.UUID, region_code: str, variable
                 return None
 
 
-def _criteria(finding: Finding) -> dict:
+def _criteria(finding: Finding, q_value: float) -> dict:
+    """q_value is the finding's p-value after Benjamini-Hochberg adjustment
+    across every finding in this scan: screening 16 candidates at p < 0.05
+    would otherwise expect ~1 'significant' trend by chance alone."""
     magnitude = min(abs(finding.percent_change or 0.0) / 50.0, 1.0)  # 50% change treated as "maxed out"
-    sig_strength = min(-math.log10(max(finding.p_value, 1e-10)) / 5.0, 1.0)  # p=1e-5 -> 1.0
+    sig_strength = min(-math.log10(max(q_value, 1e-10)) / 5.0, 1.0)  # q=1e-5 -> 1.0
     completeness = (finding.data_quality or {}).get("completeness", 0.0)
     verdict = (finding.robustness or {}).get("verdict")
     persistence_score = 1.0 if verdict == "robust" else 0.5 if verdict == "robust with caveats" else 0.0
@@ -114,7 +91,13 @@ def _criteria(finding: Finding) -> dict:
         "spatial_extent_fraction": round(spatial_extent, 4),
     }
     weighted_total = sum(raw[k] * w for k, w in CRITERIA_WEIGHTS.items())
-    return {**raw, "weights": CRITERIA_WEIGHTS, "weighted_total": round(weighted_total, 4)}
+    return {
+        **raw,
+        "q_value_across_scan": round(float(q_value), 6),
+        "significant_across_scan": bool(q_value < 0.05),
+        "weights": CRITERIA_WEIGHTS,
+        "weighted_total": round(weighted_total, 4),
+    }
 
 
 async def run_discovery(investigation_id: uuid.UUID) -> None:
@@ -145,9 +128,10 @@ async def run_discovery(investigation_id: uuid.UUID) -> None:
             await session.execute(select(Finding).where(Finding.investigation_id == investigation_id))
         ).scalars().all()
 
+        q_values = benjamini_hochberg([f.p_value for f in findings])
         scored = []
-        for f in findings:
-            criteria = _criteria(f)
+        for f, q in zip(findings, q_values):
+            criteria = _criteria(f, q)
             f.discovery_score = criteria
             scored.append((criteria["weighted_total"], f))
         scored.sort(key=lambda t: t[0], reverse=True)
@@ -164,10 +148,12 @@ async def run_discovery(investigation_id: uuid.UUID) -> None:
         await session.commit()
 
         n_significant = sum(1 for f in findings if f.significance_classification == "statistically_significant")
+        n_after_fdr = sum(1 for q in q_values if q < 0.05)
         await recorder.emit(
             "REPORT_AGENT", "done",
             f"Discovery complete: {len(findings)} findings produced from {len(DISCOVERY_CANDIDATES)} candidates "
-            f"screened, {n_significant} statistically significant.",
-            {"n_findings": len(findings), "n_significant": n_significant},
+            f"screened, {n_significant} statistically significant on their own and {n_after_fdr} after correcting "
+            f"for testing {len(findings)} candidates at once (Benjamini-Hochberg).",
+            {"n_findings": len(findings), "n_significant": n_significant, "n_significant_after_fdr": n_after_fdr},
         )
         await recorder.close()

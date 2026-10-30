@@ -5,6 +5,7 @@ opposite directions in different places."""
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.state import InvestigationState
+from app.agents.trend_agent import MIN_RECORD_YEARS
 from app.nasa.base import NASAAdapterError
 from app.nasa.catalog import VARIABLES_BY_CODE, dataset_code_for_variable
 from app.nasa.regions import REGIONS_BY_CODE
@@ -35,13 +36,13 @@ async def run(session: AsyncSession, recorder: StepRecorder, state: Investigatio
             msg = (
                 f"Found opposite regional trends within {state.region.name}: "
                 f"{opposite['increasing_cells']} grid cells increasing, {opposite['decreasing_cells']} "
-                f"decreasing (of {opposite['significant_cells']} statistically significant cells)."
+                f"decreasing (of {opposite['significant_cells']} cells significant after false-discovery-rate control)."
             )
         else:
             msg = (
                 f"Spatial pattern is consistent across {state.region.name}: "
                 f"{opposite['increasing_cells']} increasing vs {opposite['decreasing_cells']} decreasing "
-                f"significant cells — no strong opposite-direction split detected."
+                f"cells significant after false-discovery-rate control — no opposite-direction split detected."
             )
         await recorder.emit("SPATIAL_AGENT", "done", msg, {"opposite_trends": opposite, "n_cells": len(cell_trends)})
     except NASAAdapterError as exc:
@@ -65,11 +66,11 @@ async def _compare_named_regions(session: AsyncSession, recorder: StepRecorder, 
         other_series = await nasa_tools.query_nasa_data(
             session, dataset_code, state.plan.variable_code, other_region, state.start_date, state.end_date
         )
-        other_years, other_values = analysis_tools.calculate_time_series(other_series, freq="annual")
-        if len(other_years) < 5:
+        other_bundle = analysis_tools.prepare_monthly(other_series)
+        if other_bundle.coverage_years < MIN_RECORD_YEARS:
             await recorder.emit("SPATIAL_AGENT", "skipped", f"Not enough data for {other_region.name} to compare.")
             return
-        other_trend = analysis_tools.calculate_trend(other_years, other_values)
+        other_trend = analysis_tools.calculate_primary_trend(other_bundle)
         comparison = analysis_tools.compare_regions(state.trend_result, other_trend, state.region.name, other_region.name)
         state.compare_result = comparison
 

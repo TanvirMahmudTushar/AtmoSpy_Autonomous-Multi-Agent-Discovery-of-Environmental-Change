@@ -40,7 +40,7 @@ def _build_skeptic_points(state: InvestigationState) -> list[str]:
     # 2. Short series are prone to multi-year natural cycles masquerading as trends.
     if trend.n_years < SHORT_SERIES_YEARS:
         points.append(
-            f"Only {trend.n_years} annual points were available. Short climate series are susceptible to "
+            f"Only {trend.n_years} years of data were available. Short climate series are susceptible to "
             "multi-year natural oscillations producing an apparently significant trend that would not hold "
             "over a longer record."
         )
@@ -78,6 +78,29 @@ def _build_skeptic_points(state: InvestigationState) -> list[str]:
         points.append(
             f"Only {state.quality_report.completeness:.0%} of the requested period had data — gaps "
             "concentrated in a particular season or year could bias the estimated trend."
+        )
+
+    # 7. Persistence: consecutive values that resemble each other carry less independent information.
+    if trend.low_n_eff:
+        points.append(
+            f"Consecutive values are strongly correlated (lag-1 autocorrelation {trend.lag1:.2f}), so the "
+            f"{trend.n_points} data points carry only about {trend.n_eff:.0f} independent pieces of information. "
+            "Slow natural swings can look like trends in records like this."
+        )
+
+    # 8. The two independent significance tests disagree.
+    mk_sig = trend.mk_p_value < 0.05
+    t_sig = trend.ols_p_value < 0.05
+    if mk_sig != t_sig:
+        points.append(
+            f"The two significance tests disagree: Mann-Kendall gives p = {trend.mk_p_value:.4f} but the "
+            f"t-test gives p = {trend.ols_p_value:.4f}. The trend is borderline; outliers or a non-linear "
+            "shape can pull the two tests apart."
+        )
+    if trend.seasonal_mk_p_value is not None and mk_sig and trend.seasonal_mk_p_value >= 0.05:
+        points.append(
+            f"Testing each calendar month separately (seasonal Mann-Kendall, p = {trend.seasonal_mk_p_value:.4f}) "
+            "does not confirm the trend — it may be concentrated in a few months rather than year-round."
         )
 
     return points

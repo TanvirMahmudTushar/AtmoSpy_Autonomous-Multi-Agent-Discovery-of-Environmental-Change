@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.state import InvestigationState
 from app.analysis.significance import classify_significance, effect_size
+from app.analysis.trend import ANALYSIS_VERSION, TrendResult
 from app.models import Dataset, Finding, Provenance, Region, Report, Variable, Visualization
 from app.nasa.catalog import VARIABLES_BY_CODE, dataset_code_for_variable
 from app.nasa.registry import get_adapter
@@ -23,6 +24,30 @@ async def _get_or_create_region(session: AsyncSession, region_def) -> Region:
     if row is None:
         raise RuntimeError(f"Region {region_def.code} not seeded — run app.db.seed first.")
     return row
+
+
+def _method_description(trend: TrendResult) -> str:
+    basis = (
+        "monthly anomalies (seasonal cycle removed)" if trend.basis == "monthly_anomaly" else "annual means"
+    )
+    return (
+        f"Sen's slope with a Mann-Kendall test on {basis}, both corrected for lag-1 autocorrelation "
+        f"(r1 = {trend.lag1:.2f}); OLS t-test with effective sample size n_eff = {trend.n_eff:.0f} as a second check"
+    )
+
+
+def _processing_description(daily: bool, dataset_name: str, trend: TrendResult) -> str:
+    steps = f"{'Daily' if daily else 'Monthly'} {dataset_name} values"
+    if daily:
+        steps += " averaged to monthly means (months with under 70% of days observed are dropped)"
+    if trend.basis == "monthly_anomaly":
+        steps += (
+            ", the average seasonal cycle (monthly climatology over the record) subtracted to give anomalies, "
+            "then trend-tested; annual means are shown for reference."
+        )
+    else:
+        steps += ", aggregated to annual means, then trend-tested."
+    return steps
 
 
 def _slim_related(related: list[dict]) -> list[dict]:
@@ -42,6 +67,12 @@ def _build_facts(state: InvestigationState, var_info, dataset_row: Dataset, regi
         "start_year": trend_result.start_year,
         "end_year": trend_result.end_year,
         "trend_per_year": trend_result.sen_slope_per_year,
+        "trend_per_decade": trend_result.slope_per_decade,
+        "trend_basis": trend_result.basis,
+        "t_test_p_value": trend_result.ols_p_value,
+        "effective_sample_size": round(trend_result.n_eff),
+        "years_needed_to_detect": (state.detectability or {}).get("years_needed"),
+        "seasonal_trends": state.seasonal_trends,
         "total_change": trend_result.total_change,
         "percent_change": trend_result.percent_change,
         "p_value": trend_result.mk_p_value,
@@ -91,8 +122,13 @@ async def run(session: AsyncSession, recorder: StepRecorder, state: Investigatio
         total_change=trend_result.total_change,
         percent_change=trend_result.percent_change,
         effect_size=effect_size(trend_result.total_change, trend_result.std_dev),
-        statistical_method="Mann-Kendall trend test with Sen's slope estimator (OLS regression computed for comparison)",
+        statistical_method=_method_description(trend_result),
         p_value=trend_result.mk_p_value,
+        analysis_version=ANALYSIS_VERSION,
+        temporal_basis=trend_result.basis,
+        trend_details=trend_result.to_dict(),
+        detectability=state.detectability,
+        seasonal_trends=state.seasonal_trends,
         confidence_interval=state.confidence_interval,
         significance_classification=state.significance["classification"],
         importance_note=state.importance_note or "",
@@ -115,7 +151,7 @@ async def run(session: AsyncSession, recorder: StepRecorder, state: Investigatio
 
     ts_chart = report_tools.generate_time_series_chart(
         state.years, state.values, trend_result, state.change_points, var_info.name, var_info.units,
-        trend_band=state.trend_band,
+        monthly=state.monthly,
     )
     session.add(Visualization(finding_id=finding.id, investigation_id=state.investigation_id, kind="timeseries", data=ts_chart))
     state.visualizations["timeseries"] = ts_chart
@@ -168,9 +204,8 @@ async def run(session: AsyncSession, recorder: StepRecorder, state: Investigatio
             source_name=dataset_row.name,
             dataset_version=dataset_row.version,
             retrieval_time=datetime.now(timezone.utc),
-            processing_method=(
-                f"{'Daily' if get_adapter(dataset_code).get_metadata().temporal_resolution_days <= 1.0 else 'Monthly'} "
-                f"{dataset_row.name} values aggregated to annual means (pandas), then trend-tested."
+            processing_method=_processing_description(
+                get_adapter(dataset_code).get_metadata().temporal_resolution_days <= 1.0, dataset_row.name, trend_result
             ),
             statistical_method=finding.statistical_method,
             url=state.point_series.source_url,

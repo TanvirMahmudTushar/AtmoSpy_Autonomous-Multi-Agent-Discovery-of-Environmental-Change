@@ -8,6 +8,7 @@ import { ChangeScene } from "@/components/change/ChangeScene";
 import { ImpactChain } from "@/components/change/ImpactChain";
 import { SpatialChangeMap } from "@/components/change/SpatialChangeMap";
 import { ExportMenu } from "@/components/findings/ExportMenu";
+import { TrendEvidence } from "@/components/findings/TrendEvidence";
 import { PixelSprite } from "@/components/pixel/PixelSprite";
 import { formatPValue, formatPercent } from "@/lib/utils";
 import type { FindingDetail } from "@/lib/types";
@@ -82,7 +83,7 @@ export function FindingReport({ finding }: { finding: FindingDetail }) {
             <div className="font-display text-[8px] text-[var(--chart-good)]">Statistically significant</div>
             <p className="mt-1 text-xs text-[var(--app-ink-soft)]">
               {finding.significance_classification === "statistically_significant"
-                ? `Yes — the Mann-Kendall test rejects "no trend" (${formatPValue(finding.p_value)} < 0.05).`
+                ? `Yes — the Mann-Kendall test${finding.trend_details ? ", corrected for autocorrelation," : ""} rejects "no trend" (${formatPValue(finding.p_value)} < 0.05).`
                 : `No — ${formatPValue(finding.p_value)} does not clear the 0.05 threshold.`}
             </p>
           </div>
@@ -97,6 +98,13 @@ export function FindingReport({ finding }: { finding: FindingDetail }) {
         <Panel variant="hud">
           <PanelTitle>Time series</PanelTitle>
           <TimeSeriesChart data={finding.visualizations.timeseries} />
+        </Panel>
+      )}
+
+      {finding.trend_details && (
+        <Panel variant="hud">
+          <PanelTitle>How sure are we?</PanelTitle>
+          <TrendEvidence finding={finding} />
         </Panel>
       )}
 

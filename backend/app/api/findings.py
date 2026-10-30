@@ -135,4 +135,6 @@ async def get_finding(finding_id: uuid.UUID, session: AsyncSession = Depends(get
         robustness=f.robustness, skeptic_review=f.skeptic_review, interpretation=f.interpretation,
         limitations=f.limitations, narrative_source=f.narrative_source, visualizations=visualizations,
         provenance=provenance,
+        analysis_version=f.analysis_version, temporal_basis=f.temporal_basis, trend_details=f.trend_details,
+        detectability=f.detectability, seasonal_trends=f.seasonal_trends,
     )

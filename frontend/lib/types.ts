@@ -123,15 +123,80 @@ export interface SpatialSummary {
   increasing_examples: Array<{ lat: number; lon: number; slope_per_year: number; p_value: number }>;
   decreasing_examples: Array<{ lat: number; lon: number; slope_per_year: number; p_value: number }>;}
 
+export type TemporalBasis = "annual" | "monthly_anomaly";
+
+/** Monthly series behind an analysis-version-2 chart. Arrays align with `dates` ("YYYY-MM"). */
+export interface MonthlySeries {
+  dates: string[];
+  raw: Array<number | null>;
+  climatology: Array<number | null>;
+  anomaly: Array<number | null>;
+  climatology_by_month: Array<number | null>; // Jan..Dec
+  // present only when the trend was fit on monthly anomalies
+  fitted?: Array<number | null>;
+  ci_lower?: Array<number | null>;
+  ci_upper?: Array<number | null>;
+}
+
 export interface TimeSeriesChartData {
   kind: "timeseries";
   variable_name: string;
   units: string;
+  basis?: TemporalBasis;
   points: Array<{ year: number; value: number }>;
   trend_line: Array<{ year: number; fitted: number }>;
   trend_band: Array<{ year: number; lower: number; upper: number }>;
   change_points: Array<{ year: number; mean_before: number; mean_after: number; shift: number }>;
-  trend_summary: { slope_per_year: number; p_value: number; method: string };
+  trend_summary: { slope_per_year: number; slope_per_decade?: number; p_value: number; method: string };
+  monthly?: MonthlySeries;
+}
+
+/** Full statistics of an analysis-version-2 finding (backend TrendResult). */
+export interface TrendDetails {
+  basis: TemporalBasis;
+  basis_reason: string;
+  seasonal_sd_ratio: number | null;
+  n_points: number;
+  n_years: number;
+  start_year: number;
+  end_year: number;
+  sen_slope_per_year: number;
+  slope_per_decade: number;
+  sen_ci_lower: number;
+  sen_ci_upper: number;
+  mk_p_value: number;
+  mk_variant: string;
+  mk_p_value_original: number;
+  mk_p_value_prewhitened: number | null;
+  seasonal_mk_p_value: number | null;
+  ols_slope_per_year: number;
+  ols_t: number | null;
+  ols_p_value: number;
+  ols_p_value_naive: number;
+  ols_ci_lower: number | null;
+  ols_ci_upper: number | null;
+  lag1: number;
+  n_eff: number;
+  low_n_eff: boolean;
+  std_dev: number;
+  residual_std: number;
+}
+
+export interface Detectability {
+  method: "weatherhead_1998";
+  years_needed: number | null;
+  years_available: number;
+  detectable_now: boolean;
+  projected_year: number | null;
+}
+
+export interface SeasonalTrend {
+  season: "DJF" | "MAM" | "JJA" | "SON";
+  n_years: number;
+  slope_per_year: number;
+  slope_per_decade: number;
+  p_value: number;
+  significant: boolean;
 }
 
 export interface SpatialMapChartData {
@@ -142,7 +207,8 @@ export interface SpatialMapChartData {
   features: Array<{
     type: "Feature";
     geometry: { type: "Point"; coordinates: [number, number] };
-    properties: { slope_per_year: number; p_value: number; significant: boolean; direction: "increasing" | "decreasing" };
+    // `significant` is after false-discovery-rate control for findings with q_value
+    properties: { slope_per_year: number; p_value: number; q_value?: number; significant: boolean; direction: "increasing" | "decreasing" };
   }>;
 }
 
@@ -203,6 +269,13 @@ export interface FindingDetail extends FindingSummary {
     url: string;
   } | null;
   insight: Insight | null;
+  // 1 = annual means + uncorrected Mann-Kendall; 2 = monthly-first, autocorrelation-corrected.
+  // The fields below are null/absent on version-1 findings.
+  analysis_version?: number;
+  temporal_basis?: TemporalBasis;
+  trend_details?: TrendDetails | null;
+  detectability?: Detectability | null;
+  seasonal_trends?: SeasonalTrend[] | null;
 }
 
 export interface DatasetInfo {

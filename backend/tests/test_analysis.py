@@ -15,7 +15,7 @@ from app.analysis.quality import assess_quality
 from app.analysis.significance import classify_significance, effect_size, importance_note
 from app.analysis.spatial import build_timelapse_frames, compare_regions
 from app.nasa.base import GridCell
-from app.analysis.trend import bootstrap_trend_band, compute_trend, first_half_second_half_persistence
+from app.analysis.trend import ci_band, compute_trend, first_half_second_half_persistence, fitted
 
 
 def test_compute_trend_detects_known_linear_increase():
@@ -137,22 +137,18 @@ def test_importance_note_distinguishes_significance_from_effect_size():
     assert "significance" in note.lower()
 
 
-def test_bootstrap_trend_band_contains_fitted_line():
+def test_ci_band_contains_fitted_line_and_pivots_on_median():
     years = list(range(2000, 2024))
     rng = np.random.default_rng(7)
     values = [10 + 0.5 * (y - 2000) + rng.normal(0, 1.0) for y in years]
     trend_result = compute_trend(years, values)
-    band = bootstrap_trend_band(years, values, trend_result, n_boot=200)
+    lo, hi = ci_band(trend_result, years)
+    line = fitted(trend_result, years)
 
-    assert len(band) == len(years)
-    for i, point in enumerate(band):
-        assert point["year"] == years[i]
-        assert point["lower"] <= point["upper"]
-        fitted = trend_result.sen_intercept + trend_result.sen_slope_per_year * i
-        # the band should bracket the fitted line itself, since it's built
-        # from residual-resampled refits of that same trend
-        assert point["lower"] <= fitted + 1e-6
-        assert point["upper"] >= fitted - 1e-6
+    assert np.all(lo <= line + 1e-9) and np.all(hi >= line - 1e-9)
+    widths = hi - lo
+    # narrowest near the middle of the record, widest at the ends
+    assert widths[len(years) // 2] < widths[0] and widths[len(years) // 2] < widths[-1]
 
 
 def test_build_timelapse_frames_one_frame_per_year_with_consistent_range():
@@ -177,11 +173,3 @@ def test_build_timelapse_frames_excludes_cells_below_min_years():
     assert result["years"] == []
     assert result["frames"] == {}
 
-
-def test_bootstrap_trend_band_is_reproducible_with_fixed_seed():
-    years = list(range(2000, 2020))
-    values = [10 + 0.2 * i for i in range(len(years))]
-    trend_result = compute_trend(years, values)
-    band_a = bootstrap_trend_band(years, values, trend_result, n_boot=100, seed=42)
-    band_b = bootstrap_trend_band(years, values, trend_result, n_boot=100, seed=42)
-    assert band_a == band_b

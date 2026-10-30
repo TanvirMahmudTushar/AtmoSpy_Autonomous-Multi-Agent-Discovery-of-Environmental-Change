@@ -20,6 +20,7 @@ from sqlalchemy import select
 
 from app.agents.orchestrator import run_pipeline
 from app.agents.state import InvestigationState
+from app.analysis.trend import ANALYSIS_VERSION
 from app.db.session import AsyncSessionLocal
 from app.llm.planner import InvestigationPlan
 from app.models import Investigation, Watch
@@ -37,6 +38,11 @@ def _build_note(watch: Watch, new_trend: float | None, new_significance: str | N
         return "This check produced insufficient data — no finding to compare."
     if watch.last_trend_per_year is None:
         return "First check for this watch — nothing to compare against yet."
+    if (watch.last_analysis_version or 1) != ANALYSIS_VERSION:
+        return (
+            "The analysis method was upgraded since the last check (monthly anomalies, autocorrelation-corrected "
+            "tests), so this check is a new baseline rather than a comparison."
+        )
 
     sign_flipped = (watch.last_trend_per_year >= 0) != (new_trend >= 0)
     became_significant = watch.last_significance != "statistically_significant" and new_significance == "statistically_significant"
@@ -121,6 +127,7 @@ async def execute_watch_check(watch_id: uuid.UUID, investigation_id: uuid.UUID) 
             watch.prev_significance = watch.last_significance
             watch.last_trend_per_year = new_trend
             watch.last_significance = new_significance
+            watch.last_analysis_version = ANALYSIS_VERSION if new_trend is not None else watch.last_analysis_version
             watch.last_check_note = note
             await session.commit()
 

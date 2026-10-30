@@ -1,18 +1,11 @@
 import Link from "next/link";
-import { Panel, PanelTitle } from "@/components/ui/panel";
+import { Panel } from "@/components/ui/panel";
 import { PixelSprite } from "@/components/pixel/PixelSprite";
 import { TileSprite } from "@/components/pixel/TileSprite";
 import { Logo } from "@/components/layout/Logo";
 import { HeroAuthCTA } from "@/components/layout/HeroAuthCTA";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { AgentDiorama } from "@/components/landing/AgentDiorama";
-
-const QUESTION_EXAMPLES = [
-  "Find significant changes in soil moisture in South Asia since 2005.",
-  "Where has temperature increased significantly?",
-  "Compare temperature changes between Bangladesh and the Sahel.",
-  "Why might soil moisture be decreasing in California's Central Valley?",
-];
 
 const PIPELINE = [
   { icon: "telescope", label: "Discover", desc: "Scan NASA data for candidate trends" },
@@ -106,38 +99,10 @@ export default function LandingPage() {
           ))}
         </div>
 
-        <div className="my-10 flex items-center justify-center gap-3 opacity-90">
+        <div className="mt-10 flex items-center justify-center gap-3 opacity-90">
           {(["sunflower", "cornGrown", "tomatoGrown", "wheatPatch", "sheep", "farmerA"] as const).map((t) => (
             <TileSprite key={t} tile={t} size={28} />
           ))}
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <Panel>
-            <PanelTitle>Ask a question, watch the agents work</PanelTitle>
-            <ul className="flex flex-col gap-2">
-              {QUESTION_EXAMPLES.map((q) => (
-                <li key={q} className="rounded-sm border-2 border-[var(--app-border)]/30 bg-[var(--app-panel-alt)] px-3 py-2 text-sm text-[var(--app-ink-soft)]">
-                  &ldquo;{q}&rdquo;
-                </li>
-              ))}
-            </ul>
-          </Panel>
-
-          <Panel>
-            <PanelTitle>What this is not</PanelTitle>
-            <div className="flex flex-col gap-3 text-sm text-[var(--app-ink-soft)]">
-              <p>
-                This is not a chatbot wearing a NASA logo. Every number — trend slope, percent change, p-value,
-                confidence interval — comes from deterministic Python statistics (Mann-Kendall, Sen&apos;s slope,
-                OLS regression) run on real NASA POWER data.
-              </p>
-              <p>
-                The AI reasoning layer (GPT-OSS-120B via Groq) plans investigations and explains results in plain
-                language. It never invents a number, and it never calls correlation causation.
-              </p>
-            </div>
-          </Panel>
         </div>
       </div>
     </div>

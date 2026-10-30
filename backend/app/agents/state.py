@@ -10,6 +10,7 @@ from datetime import date
 
 from app.analysis.quality import QualityReport
 from app.analysis.spatial import CellTrend
+from app.analysis.timeseries import MonthlyBundle
 from app.analysis.trend import TrendResult
 from app.llm.planner import InvestigationPlan
 from app.nasa.base import GridSeries, PointSeries
@@ -26,15 +27,19 @@ class InvestigationState:
 
     point_series: PointSeries | None = None
     quality_report: QualityReport | None = None
+    monthly: MonthlyBundle | None = None
+    # Annual means: a cross-check on the monthly-anomaly trend, and the input
+    # for change points, persistence, relationships and the annual chart.
     years: list[int] = field(default_factory=list)
     values: list[float] = field(default_factory=list)
 
     trend_result: TrendResult | None = None
+    seasonal_trends: list[dict] = field(default_factory=list)
     change_points: list[dict] = field(default_factory=list)
-    trend_band: list[dict] = field(default_factory=list)
     significance: dict | None = None
     confidence_interval: dict | None = None
     importance_note: str | None = None
+    detectability: dict | None = None
     persistence: dict | None = None
     robustness_verdict: str | None = None
     robustness_caveats: list[str] = field(default_factory=list)

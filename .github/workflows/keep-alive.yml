@@ -1,0 +1,19 @@
+# Render's free plan spins the backend down after ~15 min idle, and the next
+# visitor waits 30-60s for it to boot. Pinging the health check every 10 min
+# keeps it warm; one always-on service fits in Render's 750 free hours/month.
+# GitHub may delay scheduled runs by a few minutes, which is still inside the
+# 15 min window most of the time.
+name: Keep backend awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping /api/health
+        run: curl --fail --silent --show-error --max-time 90 --retry 2 https://atmospy-api.onrender.com/api/health
