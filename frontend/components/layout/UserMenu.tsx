@@ -87,7 +87,7 @@ export function UserMenu() {
         onClick={handleLogout}
         title="Sign out"
         aria-label="Sign out"
-        className="flex h-[34px] w-8 items-center justify-center rounded-sm border-2 border-[var(--app-hud-line)] bg-[var(--app-panel-alt)] text-[var(--app-ink-soft)] hover:border-[var(--chart-critical)] hover:text-[var(--chart-critical)]"
+        className="flex h-[34px] w-8 items-center justify-center rounded-sm border-2 border-[var(--app-hud-line)] bg-[var(--app-panel-alt)] text-[var(--app-ink-soft)] hover:border-[var(--chart-critical)] hover:text-[var(--text-critical)]"
       >
         <LogOut size={14} />
       </button>

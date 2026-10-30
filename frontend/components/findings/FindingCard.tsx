@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ChangeGlyph } from "@/components/change/ChangeGlyph";
 import { SignificanceBadge } from "@/components/ui/badge";
 import { summaryChange } from "@/lib/changeModel";
-import { CONCERN_COLOR, CONCERN_LABEL } from "@/lib/insightView";
+import { CONCERN_COLOR, CONCERN_LABEL, CONCERN_TEXT_COLOR } from "@/lib/insightView";
 import { formatPercent, formatPValue } from "@/lib/utils";
 import type { FindingSummary } from "@/lib/types";
 
@@ -19,7 +19,7 @@ export function FindingCard({ finding }: { finding: FindingSummary }) {
             <div className="text-sm text-[var(--app-ink-soft)]">{finding.region_name}</div>
           </div>
           {finding.discovery_score?.rank && (
-            <span className="font-mono-data text-[10px] text-[var(--app-accent-gold)]">#{finding.discovery_score.rank}</span>
+            <span className="font-mono-data text-[10px] text-[var(--text-warning)]">#{finding.discovery_score.rank}</span>
           )}
         </div>
 
@@ -41,7 +41,7 @@ export function FindingCard({ finding }: { finding: FindingSummary }) {
           {finding.concern !== "none" && (
             <span
               className="px-1.5 py-0.5 font-display text-[7px]"
-              style={{ border: `2px solid ${CONCERN_COLOR[finding.concern]}`, color: CONCERN_COLOR[finding.concern] }}
+              style={{ border: `2px solid ${CONCERN_COLOR[finding.concern]}`, color: CONCERN_TEXT_COLOR[finding.concern] }}
               title="Level of concern, from the size and direction of the change — see the finding for why"
             >
               {CONCERN_LABEL[finding.concern]}

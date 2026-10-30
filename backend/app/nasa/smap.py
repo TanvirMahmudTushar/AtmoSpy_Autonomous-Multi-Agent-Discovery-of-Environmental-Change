@@ -97,6 +97,7 @@ def _month_starts(start: date, end: date) -> list[date]:
 
 class SmapAdapter(NASADataAdapter):
     code = "SMAP_L3"
+    slow = True  # one full HDF5 download per month: ~10 s each, minutes per region
 
     def __init__(self):
         self._token = get_settings().NASA_EARTHDATA_TOKEN

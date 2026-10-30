@@ -86,7 +86,7 @@ function WatchCard({
         </button>
         <button
           onClick={onDelete}
-          className="rounded-sm border border-[var(--chart-critical)]/40 px-2.5 py-1.5 text-[11px] text-[var(--chart-critical)] hover:bg-[var(--chart-critical)]/10"
+          className="rounded-sm border border-[var(--chart-critical)]/40 px-2.5 py-1.5 text-[11px] text-[var(--text-critical)] hover:bg-[var(--chart-critical)]/10"
         >
           Delete
         </button>
@@ -238,7 +238,7 @@ export default function WatchesPage() {
                 {creating ? "Adding..." : "Add watch"}
               </PixelButton>
             </div>
-            {error && <p className="mt-3 text-xs text-[var(--chart-critical)]">{error}</p>}
+            {error && <p className="mt-3 text-xs text-[var(--text-critical)]">{error}</p>}
           </Panel>
 
           {watches.length === 0 && (

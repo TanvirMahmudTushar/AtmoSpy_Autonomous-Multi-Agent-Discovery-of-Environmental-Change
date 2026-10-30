@@ -15,9 +15,12 @@ const SERVER_API_URL = process.env.INTERNAL_API_URL || API_URL;
 // Shared by generateMetadata (page.tsx) and the dynamic OG image route —
 // both need the same finding fetched server-side, so this is the one place
 // that talks to the backend for this route segment.
+//
+// Cached for an hour: a finding is never edited after it's filed, and the
+// backend is a single small instance that every uncached render would hit.
 export async function fetchFindingServer(id: string): Promise<FindingDetail | null> {
   try {
-    const res = await fetch(`${SERVER_API_URL}/api/findings/${id}`, { cache: "no-store" });
+    const res = await fetch(`${SERVER_API_URL}/api/findings/${id}`, { next: { revalidate: 3600 } });
     if (!res.ok) return null;
     return (await res.json()) as FindingDetail;
   } catch {

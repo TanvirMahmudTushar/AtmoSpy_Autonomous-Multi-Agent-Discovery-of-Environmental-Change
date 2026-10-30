@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import AsyncSessionLocal
 from app.models import Dataset, Region, Variable
-from app.nasa.regions import REGIONS
+from app.nasa.regions import REGIONS, RegionDef
 from app.nasa.registry import list_dataset_metadata
 
 
@@ -66,35 +66,41 @@ async def seed_datasets_and_variables(session: AsyncSession) -> dict[str, dict[s
     return code_to_ids
 
 
+async def upsert_region(session: AsyncSession, r: RegionDef) -> Region:
+    """Insert or refresh one region row. Used by the seed and on demand by the
+    Report Agent, so new presets and user-drawn boxes need no re-seed."""
+    existing = (await session.execute(select(Region).where(Region.code == r.code))).scalar_one_or_none()
+    wkt = (
+        f"POLYGON(({r.min_lon} {r.min_lat}, {r.max_lon} {r.min_lat}, "
+        f"{r.max_lon} {r.max_lat}, {r.min_lon} {r.max_lat}, {r.min_lon} {r.min_lat}))"
+    )
+    if existing is None:
+        existing = Region(
+            code=r.code,
+            name=r.name,
+            kind=r.kind,
+            min_lat=r.min_lat,
+            max_lat=r.max_lat,
+            min_lon=r.min_lon,
+            max_lon=r.max_lon,
+            centroid_lat=r.centroid_lat,
+            centroid_lon=r.centroid_lon,
+            geom=f"SRID=4326;{wkt}",
+        )
+        session.add(existing)
+        await session.flush()
+    else:
+        existing.name = r.name
+        existing.kind = r.kind
+        existing.min_lat, existing.max_lat = r.min_lat, r.max_lat
+        existing.min_lon, existing.max_lon = r.min_lon, r.max_lon
+        existing.centroid_lat, existing.centroid_lon = r.centroid_lat, r.centroid_lon
+    return existing
+
+
 async def seed_regions(session: AsyncSession) -> None:
     for r in REGIONS:
-        existing = (
-            await session.execute(select(Region).where(Region.code == r.code))
-        ).scalar_one_or_none()
-        wkt = (
-            f"POLYGON(({r.min_lon} {r.min_lat}, {r.max_lon} {r.min_lat}, "
-            f"{r.max_lon} {r.max_lat}, {r.min_lon} {r.max_lat}, {r.min_lon} {r.min_lat}))"
-        )
-        if existing is None:
-            session.add(
-                Region(
-                    code=r.code,
-                    name=r.name,
-                    kind=r.kind,
-                    min_lat=r.min_lat,
-                    max_lat=r.max_lat,
-                    min_lon=r.min_lon,
-                    max_lon=r.max_lon,
-                    centroid_lat=r.centroid_lat,
-                    centroid_lon=r.centroid_lon,
-                    geom=f"SRID=4326;{wkt}",
-                )
-            )
-        else:
-            existing.name = r.name
-            existing.min_lat, existing.max_lat = r.min_lat, r.max_lat
-            existing.min_lon, existing.max_lon = r.min_lon, r.max_lon
-            existing.centroid_lat, existing.centroid_lon = r.centroid_lat, r.centroid_lon
+        await upsert_region(session, r)
 
 
 async def run_seed() -> None:

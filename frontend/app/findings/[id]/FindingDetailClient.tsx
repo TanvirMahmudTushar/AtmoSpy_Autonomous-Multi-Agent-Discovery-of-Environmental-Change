@@ -22,7 +22,7 @@ export function FindingDetailClient({ id }: { id: string }) {
     <div className="mx-auto max-w-4xl px-4 py-10">
       {error && (
         <Panel className="border-[var(--chart-critical)]">
-          <p className="text-sm text-[var(--chart-critical)]">{error}</p>
+          <p className="text-sm text-[var(--text-critical)]">{error}</p>
           <Link href="/findings" className="mt-3 inline-block text-sm text-[var(--app-accent-cyan)] underline">
             Browse all findings
           </Link>

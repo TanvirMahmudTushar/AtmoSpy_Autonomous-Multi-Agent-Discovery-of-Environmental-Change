@@ -23,15 +23,23 @@
   --app-panel-alt: #efe3c8;
   --app-ink: #2b2113;
   --app-ink-soft: #5b4d38;
-  --app-muted: #8a7a5c;
+  --app-muted: #6e6047; /* 4.8:1 or better on every light surface (WCAG AA) */
+  /* Text-safe status colours: >= 4.5:1 on every surface (WCAG AA). The
+     --chart-* colours are validated for marks (bars, lines, fills); text
+     uses these instead. */
+  --text-good: #086f08;
+  --text-warning: #7f5703;
+  --text-critical: #b42b2b;
+  --text-info: #2160ac;
+  --text-chart-muted: #62605c;
   --app-border: #3a2f1e;
   --app-accent-green: #3f7d43;
   --app-accent-green-dark: #2c5a2f;
   --app-accent-gold: #d9a441;
   --app-accent-gold-dark: #a8781f;
   --app-accent-sky: #4f8fd1;
-  --app-accent-clay: #b5563a;
-  --app-accent-cyan: #0d7f8f;
+  --app-accent-clay: #984831; /* 4.6:1 as text */
+  --app-accent-cyan: #0b6a78; /* 4.6:1 as text */
   --app-shadow: rgba(43, 33, 19, 0.35);
   --app-bevel-light: rgba(255, 255, 255, 0.55);
   --app-bevel-dark: rgba(43, 33, 19, 0.45);
@@ -74,7 +82,17 @@
     --app-panel-alt: #161f36;
     --app-ink: #eef3fb;
     --app-ink-soft: #a7b3cc;
-    --app-muted: #64708c;
+    --app-muted: #8a96b0; /* 5.5:1 or better on every dark surface (WCAG AA) */
+  --text-good: #0ca30c;
+  --text-warning: #fab219;
+  --text-critical: #e66767;
+  --text-info: #3e8ae6;
+  --text-chart-muted: #8a8882;
+    --text-good: #0ca30c;
+    --text-warning: #fab219;
+    --text-critical: #e66767;
+    --text-info: #3e8ae6;
+    --text-chart-muted: #8a8882;
     --app-border: #2e3b58;
     --app-accent-green: #34d399;
     --app-accent-green-dark: #16966d;
@@ -122,7 +140,7 @@
   --app-panel-alt: #161f36;
   --app-ink: #eef3fb;
   --app-ink-soft: #a7b3cc;
-  --app-muted: #64708c;
+  --app-muted: #8a96b0; /* 5.5:1 or better on every dark surface (WCAG AA) */
   --app-border: #2e3b58;
   --app-accent-green: #34d399;
   --app-accent-green-dark: #16966d;
@@ -479,5 +497,18 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .crew-toast {
     animation: none;
+  }
+}
+
+/* Demo walkthrough: the section the current caption is about. */
+.tour-highlight {
+  outline: 3px solid var(--app-accent-gold);
+  outline-offset: 6px;
+  transition: outline-color 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-highlight {
+    transition: none;
   }
 }

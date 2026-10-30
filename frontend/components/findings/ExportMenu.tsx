@@ -2,17 +2,21 @@
 
 import { useState } from "react";
 import { PixelSprite } from "@/components/pixel/PixelSprite";
+import { API_URL } from "@/lib/api";
 import {
   downloadTextFile,
   findingCsvFilename,
+  findingMonthlyCsvFilename,
   findingReportFilename,
   findingToBibtex,
   findingToCsv,
   findingToMarkdownReport,
+  findingToMonthlyCsv,
 } from "@/lib/export";
 import type { FindingDetail } from "@/lib/types";
 
 export function ExportMenu({ finding }: { finding: FindingDetail }) {
+  const monthlyCsv = findingToMonthlyCsv(finding);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -72,6 +76,27 @@ export function ExportMenu({ finding }: { finding: FindingDetail }) {
             >
               Download time series (.csv)
             </button>
+            {monthlyCsv && (
+              <button
+                onClick={() => {
+                  downloadTextFile(findingMonthlyCsvFilename(finding), monthlyCsv, "text/csv");
+                  setOpen(false);
+                }}
+                className="block w-full rounded-sm px-2 py-1.5 text-left text-sm text-[var(--app-ink-soft)] hover:bg-[var(--app-panel-alt)] hover:text-[var(--app-ink)]"
+              >
+                Download monthly data (.csv)
+              </button>
+            )}
+            {(finding.analysis_version ?? 1) >= 2 && (
+              <a
+                href={`${API_URL}/api/findings/${finding.id}/notebook`}
+                download
+                onClick={() => setOpen(false)}
+                className="block w-full rounded-sm px-2 py-1.5 text-left text-sm text-[var(--app-ink-soft)] hover:bg-[var(--app-panel-alt)] hover:text-[var(--app-ink)]"
+              >
+                Reproduce it yourself (.ipynb)
+              </a>
+            )}
             <button
               onClick={exportReport}
               className="block w-full rounded-sm px-2 py-1.5 text-left text-sm text-[var(--app-ink-soft)] hover:bg-[var(--app-panel-alt)] hover:text-[var(--app-ink)]"

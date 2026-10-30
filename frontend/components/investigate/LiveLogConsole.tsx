@@ -5,8 +5,8 @@ import type { InvestigationStep } from "@/lib/types";
 
 const STATUS_COLOR: Record<string, string> = {
   running: "var(--app-accent-cyan)",
-  done: "var(--chart-good)",
-  error: "var(--chart-critical)",
+  done: "var(--text-good)",
+  error: "var(--text-critical)",
   skipped: "var(--app-muted)",
 };
 
@@ -49,6 +49,10 @@ export function LiveLogConsole({ steps, live }: { steps: InvestigationStep[]; li
       <div
         ref={scrollRef}
         onScroll={handleScroll}
+        // focusable so keyboard users can scroll the log
+        tabIndex={0}
+        role="log"
+        aria-label="Agent log"
         className="h-64 overflow-y-auto bg-[var(--app-bg-deep)] px-3 py-2 font-mono-data text-[11px] leading-relaxed"
       >
         {steps.length === 0 && <div className="text-[var(--app-muted)]">Waiting for the orchestrator to start...</div>}

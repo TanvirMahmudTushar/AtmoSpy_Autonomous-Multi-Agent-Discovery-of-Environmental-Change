@@ -64,7 +64,7 @@ export default function FindingsPage() {
       {loading && <p className="text-sm text-[var(--app-muted)]">Loading findings...</p>}
       {error && (
         <Panel className="border-[var(--chart-critical)]">
-          <p className="text-sm text-[var(--chart-critical)]">{error}</p>
+          <p className="text-sm text-[var(--text-critical)]">{error}</p>
         </Panel>
       )}
       {!loading && !error && findings.length === 0 && (

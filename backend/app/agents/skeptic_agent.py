@@ -10,6 +10,7 @@ becoming "definitely true" in the final write-up.
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.state import InvestigationState
+from app.nasa.catalog import VARIABLES_BY_CODE
 from app.services.events import StepRecorder
 
 STRICT_ALPHA = 0.01
@@ -97,6 +98,24 @@ def _build_skeptic_points(state: InvestigationState) -> list[str]:
             f"t-test gives p = {trend.ols_p_value:.4f}. The trend is borderline; outliers or a non-linear "
             "shape can pull the two tests apart."
         )
+    # 9. A known change in the instruments or model inputs falls inside the period.
+    var_info = VARIABLES_BY_CODE.get(state.plan.variable_code)
+    for year, note in (var_info.known_breaks if var_info else ()):
+        if trend.start_year < year <= trend.end_year:
+            points.append(f"{note} Part of the trend could come from this change rather than from the Earth system.")
+
+    # 10. The regional series is thin, or isn't regional at all.
+    if state.sampling.get("method") == "area_mean" and state.sampling.get("mean_valid_area_fraction", 1.0) < LOW_COMPLETENESS:
+        points.append(
+            f"On average only {state.sampling['mean_valid_area_fraction']:.0%} of the region had data in a given month, "
+            "so the regional average leans on the parts that were observed."
+        )
+    elif state.sampling.get("method") == "centroid_point":
+        points.append(
+            "This trend comes from a single point at the centre of the region, not an average over the whole region; "
+            "other parts of the region may behave differently."
+        )
+
     if trend.seasonal_mk_p_value is not None and mk_sig and trend.seasonal_mk_p_value >= 0.05:
         points.append(
             f"Testing each calendar month separately (seasonal Mann-Kendall, p = {trend.seasonal_mk_p_value:.4f}) "

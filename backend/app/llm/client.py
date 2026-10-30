@@ -14,13 +14,20 @@ from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+LLM_TIMEOUT_SECONDS = 20.0
+
 
 class LLMClient:
     def __init__(self):
         settings = get_settings()
         self._api_key = settings.GROQ_API_KEY
         self._model = settings.GROQ_MODEL
-        self._client = AsyncGroq(api_key=self._api_key) if self._api_key else None
+        # Bounded: a slow or failing call falls back to the rule-based or
+        # template path instead of stalling an investigation (the SDK's
+        # defaults are a 60 s timeout with 2 retries).
+        self._client = (
+            AsyncGroq(api_key=self._api_key, timeout=LLM_TIMEOUT_SECONDS, max_retries=1) if self._api_key else None
+        )
 
     def is_available(self) -> bool:
         return self._client is not None

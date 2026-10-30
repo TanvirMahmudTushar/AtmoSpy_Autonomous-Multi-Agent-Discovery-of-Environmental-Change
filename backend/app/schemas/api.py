@@ -1,11 +1,44 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+
+class BBox(BaseModel):
+    min_lat: float = Field(..., ge=-90, le=90)
+    max_lat: float = Field(..., ge=-90, le=90)
+    min_lon: float = Field(..., ge=-180, le=180)
+    max_lon: float = Field(..., ge=-180, le=180)
+
+    @model_validator(mode="after")
+    def _ordered(self):
+        if self.min_lat >= self.max_lat or self.min_lon >= self.max_lon:
+            raise ValueError("bbox needs min_lat < max_lat and min_lon < max_lon")
+        return self
 
 
 class CreateInvestigationRequest(BaseModel):
-    question: str = Field(..., min_length=3, max_length=500)
+    """Either a plain-language `question`, or a structured choice (from the
+    guided wizard): `variable_code` plus a preset `region_code` or a drawn
+    `bbox`. Structured requests skip question parsing entirely."""
+
+    question: str | None = Field(None, min_length=3, max_length=500)
+    variable_code: str | None = None
+    region_code: str | None = None
+    bbox: BBox | None = None
+    start_year: int | None = Field(None, ge=1940, le=2100)
+    end_year: int | None = Field(None, ge=1940, le=2100)
+    compare_region_code: str | None = None
+    run_relationship_analysis: bool = False
+
+    @model_validator(mode="after")
+    def _question_or_choice(self):
+        structured = self.variable_code is not None
+        if not structured and not self.question:
+            raise ValueError("Send a question, or a variable_code with a region_code or bbox.")
+        if structured and (self.region_code is None) == (self.bbox is None):
+            raise ValueError("A structured request needs exactly one of region_code or bbox.")
+        return self
 
 
 class CreateInvestigationResponse(BaseModel):
@@ -82,6 +115,9 @@ class FindingSummaryOut(BaseModel):
     variable_name: str
     region_code: str
     region_name: str
+    # [min_lat, max_lat, min_lon, max_lon]; lets maps place drawn-box regions,
+    # which aren't in the preset list
+    region_bbox: list[float] | None = None
     period_start: date
     period_end: date
     trend_per_year: float
@@ -141,6 +177,18 @@ class VariableOut(BaseModel):
     units: str
     description: str
     dataset_code: str
+    # learning metadata (app/nasa/variables.yaml)
+    dataset_name: str = ""
+    available: bool = True  # False: listed, but its data isn't connected/built yet
+    definition: str = ""
+    why_it_matters: str = ""
+    scale: str = "ratio"
+    domain: str = "land"
+    place_tags: list[str] = []
+    source_label: str = ""
+    coverage_start: int | None = None
+    level_hpa: int | None = None
+    known_breaks: list[dict] = []
 
 
 class RegionOut(BaseModel):
@@ -153,3 +201,5 @@ class RegionOut(BaseModel):
     max_lon: float
     centroid_lat: float
     centroid_lon: float
+    place_tags: list[str] = []
+    notes: str = ""

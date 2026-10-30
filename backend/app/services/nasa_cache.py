@@ -147,17 +147,21 @@ async def get_grid_series(
     start: date,
     end: date,
 ) -> GridSeries:
+    adapter: NASADataAdapter = get_adapter(dataset_code)
+    if not getattr(adapter, "cacheable", True):  # e.g. cube reads, already fast
+        return await adapter.query_grid_series(variable, min_lat, max_lat, min_lon, max_lon, start, end)
+
     params = {
         "dataset": dataset_code, "kind": "grid", "variable": variable,
         "min_lat": min_lat, "max_lat": max_lat, "min_lon": min_lon, "max_lon": max_lon,
         "start": start.isoformat(), "end": end.isoformat(),
+        "format": 2,  # 2 = monthly cell values (format 1 held POWER annual means)
     }
     key = _cache_key(**params)
     cached = await _get_cached(session, key)
     if cached is not None:
         return _json_to_grid_series(cached)
 
-    adapter: NASADataAdapter = get_adapter(dataset_code)
     async with _semaphore:
         result = await adapter.query_grid_series(variable, min_lat, max_lat, min_lon, max_lon, start, end)
 

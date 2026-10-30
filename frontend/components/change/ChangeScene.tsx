@@ -138,7 +138,7 @@ function ChangeSceneBody({ finding, model }: { finding: FindingDetail; model: Ch
   const shownYear = Math.round(year);
   const observed = model.observedAt(shownYear);
   const color = directionColor(model.direction);
-  const sigColor = model.significant ? "var(--chart-good)" : "var(--app-muted)";
+  const sigColor = model.significant ? "var(--text-good)" : "var(--app-muted)"; // text-safe (WCAG AA)
 
   const tab = (id: "compare" | "years", label: string) => (
     <button
@@ -238,7 +238,7 @@ function ChangeSceneBody({ finding, model }: { finding: FindingDetail; model: Ch
                   <span
                     key={cp.year}
                     title={`${cp.year}: abrupt step of ${cp.shift > 0 ? "+" : "−"}${formatQuantity(cp.shift, model.meta)}`}
-                    className="absolute top-4 -translate-x-1/2 font-display text-[7px] text-[var(--app-accent-gold)]"
+                    className="absolute top-4 -translate-x-1/2 font-display text-[7px] text-[var(--text-warning)]"
                     style={{ left: `${((cp.year - model.startYear) / model.span) * 100}%` }}
                   >
                     ▲ step

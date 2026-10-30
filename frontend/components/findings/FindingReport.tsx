@@ -10,7 +10,7 @@ import { SpatialChangeMap } from "@/components/change/SpatialChangeMap";
 import { ExportMenu } from "@/components/findings/ExportMenu";
 import { TrendEvidence } from "@/components/findings/TrendEvidence";
 import { PixelSprite } from "@/components/pixel/PixelSprite";
-import { formatPValue, formatPercent } from "@/lib/utils";
+import { formatPValue, formatPercent, formatSigFig } from "@/lib/utils";
 import type { FindingDetail } from "@/lib/types";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -22,7 +22,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+const signed = (n: number) => `${n > 0 ? "+" : ""}${formatSigFig(n)}`;
+
 export function FindingReport({ finding }: { finding: FindingDetail }) {
+  // analysis-version-2 statistics; absent on older findings
+  const t = finding.trend_details ?? null;
+  const units = finding.trend_units.replace(/\/year$/, "");
+  const significant = finding.significance_classification === "statistically_significant";
   return (
     <div className="flex flex-col gap-6">
       <Panel variant="hud">
@@ -40,26 +46,39 @@ export function FindingReport({ finding }: { finding: FindingDetail }) {
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-5 sm:grid-cols-4">
+        <div data-tour="tiles" className="mt-6 grid grid-cols-2 gap-5 sm:grid-cols-4">
           <StatReadout label="What" value={finding.what} accent="sky" />
           <StatReadout label="Where" value={finding.where} accent="green" />
+          {t ? (
+            <StatReadout
+              label="How much"
+              value={`${signed(t.slope_per_decade)}`}
+              unit={`${units} per decade (95% CI ${signed(t.sen_ci_lower * 10)} to ${signed(t.sen_ci_upper * 10)})`}
+              accent="gold"
+            />
+          ) : (
+            <StatReadout
+              label="How much"
+              value={`${finding.trend_per_year.toFixed(4)}`}
+              unit={finding.trend_units}
+              accent="gold"
+            />
+          )}
           <StatReadout
-            label="How much"
-            value={`${finding.trend_per_year.toFixed(4)}`}
-            unit={finding.trend_units}
-            accent="gold"
-          />
-          <StatReadout
-            label="Significance"
-            value={formatPValue(finding.p_value)}
-            unit={formatPercent(finding.percent_change) + " total"}
-            accent={finding.significance_classification === "statistically_significant" ? "cyan" : "clay"}
+            label={t ? "Significant?" : "Significance"}
+            value={t ? (significant ? "Yes" : "Not yet") : formatPValue(finding.p_value)}
+            unit={
+              t
+                ? `${formatPValue(finding.p_value)} (Mann-Kendall), t-test ${formatPValue(t.ols_p_value)}`
+                : formatPercent(finding.percent_change) + " total"
+            }
+            accent={significant ? "cyan" : "clay"}
           />
         </div>
       </Panel>
 
       {finding.visualizations.timeseries && (
-        <Panel variant="hud">
+        <Panel variant="hud" data-tour="scene">
           <PanelTitle>What changed</PanelTitle>
           <ChangeScene finding={finding} />
         </Panel>
@@ -72,15 +91,15 @@ export function FindingReport({ finding }: { finding: FindingDetail }) {
         </Panel>
       )}
 
-      <Panel>
+      <Panel data-tour="meaning">
         <PanelTitle>What &ldquo;significant&rdquo; means here</PanelTitle>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-sm border-2 border-[var(--chart-series-1)]/40 bg-[var(--app-panel-alt)] p-3">
-            <div className="font-display text-[8px] text-[var(--chart-series-1)]">Visually noticeable</div>
+            <div className="font-display text-[8px] text-[var(--text-info)]">Visually noticeable</div>
             <p className="mt-1 text-xs text-[var(--app-ink-soft)]">The chart below shows an apparent change — but a pattern alone proves nothing statistically.</p>
           </div>
           <div className="rounded-sm border-2 border-[var(--chart-good)]/50 bg-[var(--app-panel-alt)] p-3">
-            <div className="font-display text-[8px] text-[var(--chart-good)]">Statistically significant</div>
+            <div className="font-display text-[8px] text-[var(--text-good)]">Statistically significant</div>
             <p className="mt-1 text-xs text-[var(--app-ink-soft)]">
               {finding.significance_classification === "statistically_significant"
                 ? `Yes — the Mann-Kendall test${finding.trend_details ? ", corrected for autocorrelation," : ""} rejects "no trend" (${formatPValue(finding.p_value)} < 0.05).`
@@ -88,28 +107,28 @@ export function FindingReport({ finding }: { finding: FindingDetail }) {
             </p>
           </div>
           <div className="rounded-sm border-2 border-[var(--chart-warning)]/50 bg-[var(--app-panel-alt)] p-3">
-            <div className="font-display text-[8px] text-[var(--chart-warning)]">Scientifically important</div>
+            <div className="font-display text-[8px] text-[var(--text-warning)]">Scientifically important</div>
             <p className="mt-1 text-xs text-[var(--app-ink-soft)]">{finding.importance_note}</p>
           </div>
         </div>
       </Panel>
 
       {finding.visualizations.timeseries && (
-        <Panel variant="hud">
+        <Panel variant="hud" data-tour="timeseries">
           <PanelTitle>Time series</PanelTitle>
           <TimeSeriesChart data={finding.visualizations.timeseries} />
         </Panel>
       )}
 
       {finding.trend_details && (
-        <Panel variant="hud">
+        <Panel variant="hud" data-tour="evidence">
           <PanelTitle>How sure are we?</PanelTitle>
           <TrendEvidence finding={finding} />
         </Panel>
       )}
 
       {finding.visualizations.spatial_map && (
-        <Panel variant="hud">
+        <Panel variant="hud" data-tour="map">
           <PanelTitle>Where the change is happening</PanelTitle>
           <SpatialChangeMap
             map={finding.visualizations.spatial_map}
@@ -141,7 +160,7 @@ export function FindingReport({ finding }: { finding: FindingDetail }) {
       )}
 
       {finding.visualizations.scatter && (
-        <Panel variant="hud">
+        <Panel variant="hud" data-tour="related">
           <PanelTitle>Related variable</PanelTitle>
           <RelationshipScatter data={finding.visualizations.scatter} />
         </Panel>
@@ -180,7 +199,7 @@ export function FindingReport({ finding }: { finding: FindingDetail }) {
       </Panel>
 
       {finding.skeptic_review && (
-        <Panel variant="hud" className="border-l-4" style={{ borderLeftColor: "var(--app-accent-clay)" }}>
+        <Panel variant="hud" data-tour="skeptic" className="border-l-4" style={{ borderLeftColor: "var(--app-accent-clay)" }}>
           <div className="flex items-center gap-2">
             <PixelSprite name="flag" size={18} />
             <PanelTitle className="mb-0">Peer review (Skeptic Agent)</PanelTitle>

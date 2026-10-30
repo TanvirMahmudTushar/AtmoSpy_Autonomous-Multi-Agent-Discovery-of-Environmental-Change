@@ -14,7 +14,7 @@ export interface AuthResponse {
   user: User;
 }
 
-export type InvestigationMode = "nlp" | "discover";
+export type InvestigationMode = "nlp" | "guided" | "discover" | "scan" | "watch";
 export type InvestigationStatus = "pending" | "running" | "completed" | "failed" | "insufficient_data";
 export type SignificanceClassification = "statistically_significant" | "not_significant";
 export type DatasetStatus = "active" | "planned" | "requires_credentials";
@@ -86,6 +86,8 @@ export interface FindingSummary {
   variable_name: string;
   region_code: string;
   region_name: string;
+  /** [min_lat, max_lat, min_lon, max_lon]; places drawn-box regions on maps */
+  region_bbox?: [number, number, number, number] | null;
   period_start: string;
   period_end: string;
   trend_per_year: number;
@@ -289,12 +291,83 @@ export interface DatasetInfo {
   variables: Array<{ code: string; name: string; units: string }>;
 }
 
+export type PlaceType =
+  | "city"
+  | "desert"
+  | "rainforest"
+  | "coast"
+  | "ice"
+  | "ocean"
+  | "farmland"
+  | "mountains"
+  | "river_basin";
+
 export interface VariableInfo {
   code: string;
   name: string;
   units: string;
   description: string;
   dataset_code: string;
+  // learning metadata (backend app/nasa/variables.yaml)
+  dataset_name?: string;
+  available?: boolean;
+  definition?: string;
+  why_it_matters?: string;
+  scale?: "interval" | "ratio";
+  domain?: "land" | "ocean" | "atmosphere" | "water";
+  place_tags?: PlaceType[];
+  source_label?: string;
+  coverage_start?: number | null;
+  level_hpa?: number | null;
+  known_breaks?: Array<{ year: number; note: string }>;
+}
+
+export interface BBox {
+  min_lat: number;
+  max_lat: number;
+  min_lon: number;
+  max_lon: number;
+}
+
+/** A guided (wizard) investigation: a variable plus a preset region or a drawn box. */
+export interface StructuredInvestigation {
+  variable_code: string;
+  region_code?: string;
+  bbox?: BBox;
+  start_year?: number;
+  end_year?: number;
+  compare_region_code?: string;
+  run_relationship_analysis?: boolean;
+}
+
+export interface Suggestion {
+  variable_code: string;
+  name: string;
+  units: string;
+  definition: string;
+  reason: string;
+  source_label: string;
+  coverage_start: number | null;
+  level_hpa: number | null;
+  domain: string;
+}
+
+export interface ScanResult {
+  variable_code: string;
+  name: string;
+  units: string;
+  definition: string;
+  start_year: number;
+  end_year: number;
+  slope_per_decade: number;
+  sen_ci_per_decade: [number, number];
+  total_change: number;
+  effect_size: number;
+  p_value: number;
+  q_value: number;
+  significant: boolean;
+  basis: TemporalBasis;
+  sampling: "area_mean" | "centroid_point";
 }
 
 export interface Watch {
@@ -325,4 +398,6 @@ export interface RegionInfo {
   max_lon: number;
   centroid_lat: number;
   centroid_lon: number;
+  place_tags?: PlaceType[];
+  notes?: string;
 }

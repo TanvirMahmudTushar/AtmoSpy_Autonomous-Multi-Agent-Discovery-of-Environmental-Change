@@ -58,7 +58,7 @@ export function HeroAuthCTA() {
         )}
       </PixelButton>
       {error && (
-        <p className="absolute right-0 top-full mt-2 text-xs text-[var(--chart-critical)]" role="alert">
+        <p className="absolute right-0 top-full mt-2 text-xs text-[var(--text-critical)]" role="alert">
           {error}
         </p>
       )}

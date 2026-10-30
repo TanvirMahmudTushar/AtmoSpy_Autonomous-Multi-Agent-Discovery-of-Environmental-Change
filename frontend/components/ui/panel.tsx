@@ -49,7 +49,7 @@ export function StatReadout({
   return (
     <div className={cn("border-l-2 pl-3", className)} style={{ borderColor: accentVar }}>
       <div className="label-telemetry">{label}</div>
-      <div className="mt-1 flex items-baseline gap-1.5">
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5">
         <span className="font-mono-data text-xl font-semibold text-[var(--app-ink)] sm:text-2xl">{value}</span>
         {unit && <span className="text-xs text-[var(--app-muted)]">{unit}</span>}
       </div>

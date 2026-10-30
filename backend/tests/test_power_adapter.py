@@ -46,7 +46,7 @@ async def test_query_point_series_raises_on_power_error_message():
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_query_grid_series_extracts_annual_values_only():
+async def test_query_grid_series_keeps_monthly_values_and_drops_annual_mean():
     payload = {
         "features": [
             {
@@ -63,4 +63,6 @@ async def test_query_grid_series_extracts_annual_values_only():
     result = await adapter.query_grid_series("T2M", 22.0, 24.0, 89.0, 91.0, date(2020, 1, 1), date(2020, 12, 31))
 
     assert len(result.cells) == 1
-    assert result.cells[0].values == [20.5]  # only the "13" annual-average entry
+    # monthly values feed the regional mean and anomaly trends; "13" is POWER's annual mean
+    assert result.cells[0].values == [20.0, 21.0]
+    assert result.cells[0].dates == [date(2020, 1, 1), date(2020, 2, 1)]

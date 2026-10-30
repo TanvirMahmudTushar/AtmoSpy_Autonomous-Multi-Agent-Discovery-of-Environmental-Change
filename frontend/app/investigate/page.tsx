@@ -2,16 +2,12 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { api, eventsUrl } from "@/lib/api";
-import { useAgentStream } from "@/lib/useAgentStream";
+import { api } from "@/lib/api";
 import { useStoredId } from "@/lib/useStoredId";
-import { Panel, PanelTitle } from "@/components/ui/panel";
+import { Panel } from "@/components/ui/panel";
 import { PixelButton } from "@/components/ui/button";
-import { AgentFlowGraph } from "@/components/investigate/AgentFlowGraph";
-import { LiveLogConsole } from "@/components/investigate/LiveLogConsole";
-import { FindingReport } from "@/components/findings/FindingReport";
+import { InvestigationRun } from "@/components/investigate/InvestigationRun";
 import { PixelSprite } from "@/components/pixel/PixelSprite";
-import type { FindingDetail } from "@/lib/types";
 
 const EXAMPLES = [
   "Has temperature changed significantly in Bangladesh since 1990?",
@@ -41,10 +37,7 @@ function InvestigatePageInner() {
   const [storedId, setStoredId] = useStoredId("atmospy:investigation-id");
   const investigationId = resumeId ?? storedId;
   const [submitting, setSubmitting] = useState(false);
-  const [finding, setFinding] = useState<FindingDetail | null>(null);
-  const [findingError, setFindingError] = useState<string | null>(null);
-
-  const stream = useAgentStream(investigationId ? eventsUrl("investigations", investigationId) : null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Resuming a past investigation: show its original question read-only
   // above the (still-usable) form, so context isn't lost.
@@ -85,40 +78,16 @@ function InvestigatePageInner() {
   async function submit(q: string) {
     if (!q.trim() || submitting) return;
     setSubmitting(true);
-    setFinding(null);
-    setFindingError(null);
+    setSubmitError(null);
     try {
       const { investigation_id } = await api.createInvestigation(q.trim());
       setStoredId(investigation_id);
     } catch (err) {
-      setFindingError(err instanceof Error ? err.message : "Failed to start investigation.");
+      setSubmitError(err instanceof Error ? err.message : "Failed to start investigation.");
     } finally {
       setSubmitting(false);
     }
   }
-
-  useEffect(() => {
-    if (!stream.done || !investigationId || finding || findingError) return;
-    let cancelled = false;
-    api
-      .listFindings({ investigation_id: investigationId, limit: 1 })
-      .then((list) => {
-        if (cancelled) return;
-        if (list.length === 0) {
-          setFindingError(
-            stream.finalStatus === "insufficient_data"
-              ? "Data quality was insufficient to produce a finding for this question — see the agent log above."
-              : "No finding was produced — see the agent log above for why."
-          );
-          return;
-        }
-        return api.getFinding(list[0].id).then((f) => !cancelled && setFinding(f));
-      })
-      .catch((err) => !cancelled && setFindingError(err instanceof Error ? err.message : "Failed to load result."));
-    return () => {
-      cancelled = true;
-    };
-  }, [stream.done, stream.finalStatus, investigationId, finding, findingError]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -167,25 +136,13 @@ function InvestigatePageInner() {
         </form>
       </Panel>
 
-      {investigationId && (
-        <div className="mt-8 flex flex-col gap-4">
-          <PanelTitle>The agents at work</PanelTitle>
-          <AgentFlowGraph steps={stream.steps} mode="single" />
-          <LiveLogConsole steps={stream.steps} live={!stream.done} />
-        </div>
-      )}
-
-      {findingError && (
+      {submitError && (
         <Panel className="mt-6 border-[var(--chart-critical)]">
-          <p className="text-sm text-[var(--chart-critical)]">{findingError}</p>
+          <p className="text-sm text-[var(--text-critical)]">{submitError}</p>
         </Panel>
       )}
 
-      {finding && (
-        <div className="mt-10">
-          <FindingReport finding={finding} />
-        </div>
-      )}
+      {investigationId && <InvestigationRun investigationId={investigationId} />}
     </div>
   );
 }

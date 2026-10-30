@@ -1,6 +1,10 @@
 import type {
   AuthResponse,
+  BBox,
   DatasetInfo,
+  PlaceType,
+  StructuredInvestigation,
+  Suggestion,
   FindingDetail,
   FindingSummary,
   Investigation,
@@ -81,7 +85,23 @@ export const api = {
       body: JSON.stringify({ question }),
     }),
 
+  createStructuredInvestigation: (body: StructuredInvestigation) =>
+    request<{ investigation_id: string }>("/api/investigations", { method: "POST", body: JSON.stringify(body) }),
+
   getInvestigation: (id: string) => request<Investigation>(`/api/investigations/${id}`),
+
+  suggest: (places: PlaceType[], where: { region_code?: string; bbox?: BBox }) => {
+    const qs = new URLSearchParams();
+    places.forEach((p) => qs.append("place", p));
+    if (where.region_code) qs.set("region_code", where.region_code);
+    if (where.bbox) Object.entries(where.bbox).forEach(([k, v]) => qs.set(k, String(v)));
+    return request<{ source: "rules" | "llm"; suggestions: Suggestion[] }>(`/api/suggest?${qs.toString()}`);
+  },
+
+  startScan: (body: { region_code?: string; bbox?: BBox; start_year?: number; end_year?: number }) =>
+    request<{ investigation_id: string }>("/api/scan", { method: "POST", body: JSON.stringify(body) }),
+
+  getPlaceTypes: () => request<PlaceType[]>("/api/place-types"),
 
   listMyInvestigations: (limit = 20) => request<Investigation[]>(`/api/investigations?limit=${limit}`),
 
@@ -145,7 +165,7 @@ export const api = {
     request<{ investigation_id: string }>(`/api/watches/${id}/check-now`, { method: "POST" }),
 };
 
-export function eventsUrl(kind: "investigations" | "discover", id: string): string {
+export function eventsUrl(kind: "investigations" | "discover" | "scan", id: string): string {
   return `${API_URL}/api/${kind}/${id}/events`;
 }
 

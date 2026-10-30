@@ -1,3 +1,4 @@
+import { Term } from "@/components/glossary/Term";
 import { formatPValue, formatSigFig } from "@/lib/utils";
 import type { Detectability, FindingDetail, SeasonalTrend, TrendDetails } from "@/lib/types";
 
@@ -29,7 +30,10 @@ function Tests({ t, units }: { t: TrendDetails; units: string }) {
           Rate: {signed(t.slope_per_decade)} {perDecade}, 95% confidence interval {signed(t.sen_ci_lower * 10)} to{" "}
           {signed(t.sen_ci_upper * 10)}.
         </p>
-        <p className="mt-1 text-[var(--app-muted)]">Counts how often later values beat earlier ones; not thrown off by outliers.</p>
+        <p className="mt-1 text-[var(--app-muted)]">
+          The <Term k="mann_kendall">Mann-Kendall test</Term> counts how often later values beat earlier ones;{" "}
+          <Term k="sens_slope">Sen&apos;s slope</Term> gives the rate. Neither is thrown off by outliers.
+        </p>
       </Card>
       <Card title="t-test on the regression slope (second check)">
         <p className="text-sm text-[var(--app-ink)]">{formatPValue(t.ols_p_value)}</p>
@@ -39,7 +43,10 @@ function Tests({ t, units }: { t: TrendDetails; units: string }) {
             {signed(t.ols_ci_upper * 10)}.
           </p>
         )}
-        <p className="mt-1 text-[var(--app-muted)]">Fits a straight line and asks whether its slope could be zero.</p>
+        <p className="mt-1 text-[var(--app-muted)]">
+          The <Term k="t_test">t-test</Term> fits a straight line and asks whether its slope could be zero. Both
+          ranges are <Term k="confidence_interval">95% confidence intervals</Term>.
+        </p>
       </Card>
     </div>
   );
@@ -57,8 +64,9 @@ function Autocorrelation({ t }: { t: TrendDetails }) {
   }
   return (
     <p>
-      Neighbouring {unit} resemble each other (lag-1 autocorrelation {t.lag1.toFixed(2)}), so the {t.n_points} {unit}{" "}
-      carry about as much independent information as {Math.round(t.n_eff)}. Both tests account for this. Without the
+      Neighbouring {unit} resemble each other (<Term k="autocorrelation">autocorrelation</Term> {t.lag1.toFixed(2)}),
+      so the {t.n_points} {unit} carry about as much independent information as {Math.round(t.n_eff)} (the{" "}
+      <Term k="effective_sample_size">effective sample size</Term>). Both tests account for this. Without the
       correction the Mann-Kendall result would have been {formatPValue(t.mk_p_value_original)}, which overstates the
       certainty.
     </p>
@@ -97,7 +105,10 @@ function DetectabilityGauge({ d, significant }: { d: Detectability; significant:
         </span>
       </div>
       <p className="mt-2">{label}</p>
-      <p className="mt-1 text-[var(--app-muted)]">Estimate from Weatherhead et al. (1998), using this record&apos;s own noise.</p>
+      <p className="mt-1 text-[var(--app-muted)]">
+        <Term k="detectability">Years to detect</Term>, estimated with Weatherhead et al. (1998) from this record&apos;s
+        own noise.
+      </p>
     </div>
   );
 }

@@ -36,4 +36,5 @@ services:
       # Optional — add in the dashboard after the first deploy:
       #   GROQ_API_KEY          enables LLM planning/narration (app works without it)
       #   NASA_EARTHDATA_TOKEN  activates the GRACE-FO / SMAP adapters
+      #   CUBE_BASE_URL         public URL of the data cubes (e.g. a Cloudflare R2 bucket)
       #   CORS_ORIGIN_REGEX     allow Vercel preview URLs, e.g. https://atmospy-.*-<team>\.vercel\.app

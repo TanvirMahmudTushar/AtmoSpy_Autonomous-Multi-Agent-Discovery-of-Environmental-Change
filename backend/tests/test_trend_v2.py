@@ -38,6 +38,22 @@ def test_mann_kendall_and_sen_match_hand_calculation():
     assert r.ols_slope_per_year == pytest.approx(0.8)  # Sxy/Sxx = 8/10
 
 
+@pytest.mark.parametrize("seed, ties", [(1, False), (2, True), (3, True)])
+def test_vectorized_mann_kendall_equals_pymannkendall(seed, ties):
+    import pymannkendall as mk
+
+    rng = np.random.default_rng(seed)
+    y = rng.normal(size=300) + 0.002 * np.arange(300)
+    if ties:
+        y = np.round(y, 1)  # many tied values, exercising the variance correction
+    x = 2000 + np.arange(300) / 12
+    ref = mk.original_test(y)
+    r = compute_trend(x, y)
+    assert r.mk_p_value_original == pytest.approx(ref.p, rel=1e-9, abs=1e-15)
+    assert r.mk_tau == pytest.approx(ref.Tau, rel=1e-12)
+    assert r.sen_slope_per_year * (1 / 12) == pytest.approx(ref.slope, rel=1e-9)  # pymannkendall's slope is per step
+
+
 def test_sen_slope_is_per_year_even_with_gaps():
     # The v1 code took Sen's slope per array step; with gaps in the years the
     # per-step slope overstates the per-year rate.

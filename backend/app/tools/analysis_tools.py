@@ -3,7 +3,10 @@ Agents call. Every function is a deterministic computation — no LLM
 involvement, matching the spec's "LLM must not invent numbers" rule.
 """
 
+import dataclasses
+
 from app.analysis import changepoint, correlation, detectability, quality, significance, spatial, timeseries, trend
+from app.core.config import get_settings
 from app.nasa.base import GridSeries, PointSeries
 
 
@@ -114,6 +117,12 @@ def calculate_persistence(years: list[int], values: list[float]) -> dict:
     return trend.first_half_second_half_persistence(years, values)
 
 
+def coarsen_for_map(grid_series: GridSeries) -> GridSeries:
+    """At most MAX_SPATIAL_GRID_CELLS cells for the per-cell trend map."""
+    cells = spatial.coarsen_cells(grid_series.cells, get_settings().MAX_SPATIAL_GRID_CELLS)
+    return dataclasses.replace(grid_series, cells=cells) if cells is not grid_series.cells else grid_series
+
+
 def calculate_spatial_trends(grid_series: GridSeries):
     return spatial.compute_cell_trends(grid_series.cells)
 
@@ -128,6 +137,10 @@ def calculate_spatial_timelapse(grid_series: GridSeries) -> dict:
 
 def compare_regions(trend_a, trend_b, label_a: str, label_b: str) -> dict:
     return spatial.compare_regions(trend_a, trend_b, label_a, label_b)
+
+
+def calculate_detrended_correlation(years: list[int], x: list[float], y: list[float]):
+    return correlation.correlate_detrended(years, x, y)
 
 
 def calculate_correlation(dates_a, values_a, dates_b, values_b):

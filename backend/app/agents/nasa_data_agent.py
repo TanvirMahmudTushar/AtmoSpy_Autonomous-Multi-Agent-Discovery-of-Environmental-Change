@@ -24,7 +24,7 @@ async def run(session: AsyncSession, recorder: StepRecorder, state: Investigatio
         f"{state.plan.start_year}-{state.plan.end_year}...",
     )
     try:
-        state.point_series = await nasa_tools.query_nasa_data(
+        regional = await nasa_tools.query_region_series(
             session, dataset_code, state.plan.variable_code, state.region, state.start_date, state.end_date
         )
     except NASAAdapterError as exc:
@@ -33,10 +33,24 @@ async def run(session: AsyncSession, recorder: StepRecorder, state: Investigatio
         await recorder.emit("NASA_DATA_AGENT", "error", f"{dataset_name} request failed: {exc}")
         return state
 
+    state.point_series = regional.series
+    state.grid_series = regional.grid
+    state.sampling = regional.sampling
+
     n = len(state.point_series.values)
+    if regional.sampling["method"] == "area_mean":
+        how = (
+            f"Averaged {regional.sampling['n_cells']} grid cells over {state.region.name} "
+            f"(weighted by area) into {n} monthly values."
+        )
+    else:
+        how = (
+            f"Retrieved {n} observations at the centre of {state.region.name} "
+            f"(no regional grid: {regional.sampling['reason']})."
+        )
     await recorder.emit(
         "NASA_DATA_AGENT", "done",
-        f"Retrieved {n} observations from {dataset_name}.",
-        {"source_url": state.point_series.source_url, "n_observations": n},
+        f"{how} Source: {dataset_name}.",
+        {"source_url": state.point_series.source_url, "n_observations": n, "sampling": regional.sampling},
     )
     return state

@@ -19,6 +19,21 @@ class VariableInfo:
     description: str
     valid_min: float | None = None
     valid_max: float | None = None
+    # Learning metadata, overlaid from app/nasa/variables.yaml (see catalog_yaml.py).
+    definition: str = ""  # plain language, for students
+    why_it_matters: str = ""
+    # "interval" (e.g. degC: zero is arbitrary, so % change is meaningless) | "ratio"
+    scale: str = "ratio"
+    domain: str = "land"  # land | ocean | atmosphere | water
+    place_tags: tuple[str, ...] = ()
+    source_label: str = ""
+    coverage_start: int | None = None
+    level_hpa: int | None = None
+    # (year, note) pairs: known changes in instruments/inputs that can fake a trend
+    known_breaks: tuple[tuple[int, str], ...] = ()
+    # What physical quantity this is (several products can measure the same
+    # one); suggestions pick one per family before repeating a family.
+    family: str = ""
 
 
 @dataclass(frozen=True)
@@ -88,6 +103,9 @@ class NASAAdapterError(RuntimeError):
 
 class NASADataAdapter(ABC):
     code: str
+    # True for sources that download whole files per time step on demand
+    # (minutes per region). Quick multi-variable screens skip them.
+    slow: bool = False
 
     @abstractmethod
     def get_metadata(self) -> DatasetInfo: ...

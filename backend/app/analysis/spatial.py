@@ -38,6 +38,78 @@ class CellTrend:
         return asdict(self)
 
 
+@dataclass
+class RegionalMean:
+    dates: list
+    values: list[float]
+    missing_dates: list
+    n_cells: int
+    mean_valid_area_fraction: float
+
+
+def regional_mean(cells: list[GridCell], min_valid_area: float = 0.7) -> RegionalMean:
+    """Area-weighted (cos latitude) mean over the region's grid cells, per
+    time step. A time step counts only when cells covering at least
+    `min_valid_area` of the region's area have data, so a month seen through
+    one cloud gap can't stand in for the whole region."""
+    if not cells:
+        return RegionalMean([], [], [], 0, 0.0)
+    frame = pd.DataFrame({i: pd.Series(c.values, index=pd.to_datetime(c.dates)) for i, c in enumerate(cells)}).sort_index()
+    frame = frame[~frame.index.duplicated(keep="first")]
+    w = np.cos(np.radians([c.lat for c in cells]))
+    present = frame.notna().to_numpy()
+    vals = np.nan_to_num(frame.to_numpy())
+    area = present @ w
+    frac = area / w.sum()
+    with np.errstate(invalid="ignore", divide="ignore"):
+        mean = (vals * present) @ w / area
+    ok = frac >= min_valid_area
+    idx = frame.index
+    return RegionalMean(
+        dates=[d.date() for d in idx[ok]],
+        values=[float(v) for v in mean[ok]],
+        missing_dates=[d.date() for d in idx[~ok]],
+        n_cells=len(cells),
+        mean_valid_area_fraction=float(frac.mean()),
+    )
+
+
+def coarsen_cells(cells: list[GridCell], max_cells: int) -> list[GridCell]:
+    """Block-average a regular grid of cells down to at most ~max_cells, so a
+    continent-sized box still gives a readable, fast per-cell trend map. The
+    regional mean itself always uses every native cell."""
+    if len(cells) <= max_cells:
+        return cells
+    lats = sorted({c.lat for c in cells})
+    lons = sorted({c.lon for c in cells})
+    k = int(np.ceil(np.sqrt(len(cells) / max_cells)))
+    lat_idx = {v: i // k for i, v in enumerate(lats)}
+    lon_idx = {v: i // k for i, v in enumerate(lons)}
+    groups: dict[tuple[int, int], list[GridCell]] = {}
+    for c in cells:
+        groups.setdefault((lat_idx[c.lat], lon_idx[c.lon]), []).append(c)
+
+    out = []
+    for members in groups.values():
+        dates = sorted({d for c in members for d in c.dates})
+        pos = {d: i for i, d in enumerate(dates)}
+        num = np.zeros(len(dates))
+        den = np.zeros(len(dates))
+        for c in members:
+            w = np.cos(np.radians(c.lat))
+            idx = [pos[d] for d in c.dates]
+            np.add.at(num, idx, w * np.asarray(c.values, dtype=float))
+            np.add.at(den, idx, w)
+        keep = den > 0
+        out.append(GridCell(
+            lat=float(np.mean([c.lat for c in members])),
+            lon=float(np.mean([c.lon for c in members])),
+            dates=[d for d, ok in zip(dates, keep) if ok],
+            values=list((num[keep] / den[keep]).astype(float)),
+        ))
+    return out
+
+
 def benjamini_hochberg(p_values: list[float]) -> np.ndarray:
     """BH-adjusted p-values (q-values): q_(i) = min_{k>=i} p_(k) * m / k."""
     p = np.asarray(p_values, dtype=float)
@@ -59,11 +131,11 @@ def _cell_trend(cell: GridCell):
         years = [d.year for d in cell.dates]
         if len(years) < MIN_YEARS:
             return None
-        return compute_trend(years, cell.values)
+        return compute_trend(years, cell.values, cross_checks=False)
     bundle = timeseries.prepare(cell.dates, cell.values)
     if bundle.valid_months < MIN_MONTHS or len(bundle.annual) < MIN_YEARS:
         return None
-    return primary_trend(bundle, seasonal_test=False)
+    return primary_trend(bundle, cross_checks=False)
 
 
 def compute_cell_trends(cells: list[GridCell], alpha_fdr: float = ALPHA_FDR) -> list[CellTrend]:

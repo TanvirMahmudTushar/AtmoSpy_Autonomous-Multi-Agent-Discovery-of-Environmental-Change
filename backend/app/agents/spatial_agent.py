@@ -2,6 +2,8 @@
 looks for the case the challenge calls out: the same variable trending in
 opposite directions in different places."""
 
+import asyncio
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.state import InvestigationState
@@ -13,6 +15,17 @@ from app.services.events import StepRecorder
 from app.tools import analysis_tools, nasa_tools
 
 
+def _analyze_grid(grid):
+    grid = analysis_tools.coarsen_for_map(grid)
+    cell_trends = analysis_tools.calculate_spatial_trends(grid)
+    return (
+        grid,
+        cell_trends,
+        analysis_tools.detect_opposite_regional_trends(cell_trends),
+        analysis_tools.calculate_spatial_timelapse(grid),
+    )
+
+
 async def run(session: AsyncSession, recorder: StepRecorder, state: InvestigationState) -> InvestigationState:
     var_info = VARIABLES_BY_CODE[state.plan.variable_code]
     dataset_code = dataset_code_for_variable(state.plan.variable_code)
@@ -22,15 +35,16 @@ async def run(session: AsyncSession, recorder: StepRecorder, state: Investigatio
     )
 
     try:
-        grid = await nasa_tools.query_nasa_grid_data(
+        # The NASA Data Agent already fetched the region's grid for the area mean.
+        grid = state.grid_series or await nasa_tools.query_nasa_grid_data(
             session, dataset_code, state.plan.variable_code, state.region, state.start_date, state.end_date
         )
-        cell_trends = analysis_tools.calculate_spatial_trends(grid)
-        opposite = analysis_tools.detect_opposite_regional_trends(cell_trends)
+        # CPU-bound per-cell statistics run in a worker thread (see trend_agent).
+        grid, cell_trends, opposite, timelapse = await asyncio.to_thread(_analyze_grid, grid)
         state.grid_series = grid
         state.cell_trends = cell_trends
         state.opposite_trends = opposite
-        state.timelapse = analysis_tools.calculate_spatial_timelapse(grid)
+        state.timelapse = timelapse
 
         if opposite["has_opposite_regional_trends"]:
             msg = (
@@ -63,10 +77,10 @@ async def _compare_named_regions(session: AsyncSession, recorder: StepRecorder, 
     )
     try:
         dataset_code = dataset_code_for_variable(state.plan.variable_code)
-        other_series = await nasa_tools.query_nasa_data(
+        other = await nasa_tools.query_region_series(
             session, dataset_code, state.plan.variable_code, other_region, state.start_date, state.end_date
         )
-        other_bundle = analysis_tools.prepare_monthly(other_series)
+        other_bundle = analysis_tools.prepare_monthly(other.series)
         if other_bundle.coverage_years < MIN_RECORD_YEARS:
             await recorder.emit("SPATIAL_AGENT", "skipped", f"Not enough data for {other_region.name} to compare.")
             return

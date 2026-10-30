@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.api import auth, catalog, discover, findings, investigations, watches
+from app.api import auth, catalog, discover, explore, findings, investigations, watches
 from app.core.config import get_settings
 from app.db.session import AsyncSessionLocal
 from app.services.recovery import fail_orphaned_investigations
@@ -114,6 +114,7 @@ app.include_router(discover.router, prefix=settings.API_PREFIX)
 app.include_router(findings.router, prefix=settings.API_PREFIX)
 app.include_router(catalog.router, prefix=settings.API_PREFIX)
 app.include_router(watches.router, prefix=settings.API_PREFIX)
+app.include_router(explore.router, prefix=settings.API_PREFIX)
 
 
 @app.get(f"{settings.API_PREFIX}/health")

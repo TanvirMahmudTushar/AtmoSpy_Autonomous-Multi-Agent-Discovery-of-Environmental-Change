@@ -10,11 +10,13 @@ import { UserMenu } from "./UserMenu";
 import { useAuth } from "@/lib/AuthContext";
 
 const LINKS = [
+  { href: "/detect", label: "Detect" },
   { href: "/discover", label: "Discover" },
-  { href: "/investigate", label: "Investigate" },
+  { href: "/investigate", label: "Ask" },
   { href: "/globe", label: "Globe" },
   { href: "/watches", label: "Watches" },
   { href: "/findings", label: "Findings" },
+  { href: "/learn", label: "Learn" },
 ];
 
 export function NavBar() {

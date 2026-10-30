@@ -41,10 +41,18 @@ DISCLAIMER = (
     "to any one cause. Every number elsewhere on this page comes from the computed analysis."
 )
 
-REANALYSIS_NOTE = (
-    "The underlying data is reanalysis (model-assimilated) sampled at the region's centre point, "
-    "so a trend can partly reflect changes in the observing system rather than the climate."
-)
+def reanalysis_note(sampling: dict | None) -> str:
+    """Findings without a recorded sampling method predate regional averaging
+    and really were sampled at the region's centre point."""
+    where = (
+        "averaged over the region's grid cells"
+        if (sampling or {}).get("method") == "area_mean"
+        else "sampled at the region's centre point"
+    )
+    return (
+        f"The underlying data is reanalysis (model-assimilated) {where}, "
+        "so a trend can partly reflect changes in the observing system rather than the climate."
+    )
 
 
 def family_of(variable_code: str) -> str:
@@ -154,7 +162,8 @@ def _base_units(trend_units: str) -> str:
 
 
 # Satellite-retrieved, not model reanalysis — the standing data caveat does not apply.
-_NON_REANALYSIS = {"lwe_thickness", "soil_moisture"}
+# Direct satellite observations; everything else is model or reanalysis output.
+_NON_REANALYSIS = {"lwe_thickness", "soil_moisture", "GPM_PRECIP", "AIRS_TSURF", "OMI_NO2"}
 
 
 def _evidence(
@@ -164,6 +173,7 @@ def _evidence(
     related_variables: list[dict] | None,
     spatial_summary: dict | None,
     reanalysis: bool,
+    sampling: dict | None = None,
 ) -> list[dict]:
     """What this finding's own data says that bears on cause — all from computed fields."""
     out: list[dict] = []
@@ -218,7 +228,7 @@ def _evidence(
         })
 
     if reanalysis:
-        out.append({"kind": "data", "text": REANALYSIS_NOTE})
+        out.append({"kind": "data", "text": reanalysis_note(sampling)})
     return out
 
 
@@ -236,10 +246,13 @@ def build_insight(
     spatial_summary: dict | None,
     change_points: list[dict] | None,
     related_variables: list[dict] | None,
+    sampling: dict | None = None,
 ) -> dict:
     family = family_of(variable_code)
     reanalysis = variable_code not in _NON_REANALYSIS
-    evidence = _evidence(total_change, trend_units, change_points, related_variables, spatial_summary, reanalysis)
+    evidence = _evidence(
+        total_change, trend_units, change_points, related_variables, spatial_summary, reanalysis, sampling
+    )
     direction = direction_of(total_change)
     confidence, confidence_reasons = confidence_of(robustness, skeptic)
     concern, concern_reasons = concern_of(family, total_change, effect_size, significant, confidence)

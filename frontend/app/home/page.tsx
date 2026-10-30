@@ -28,6 +28,13 @@ function timeAgo(iso: string): string {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+/** Where to reopen a past run: scans and Discover have their own views. */
+function resumeHref(inv: Investigation): string {
+  if (inv.mode === "scan") return `/scan/${inv.id}`;
+  if (inv.mode === "discover") return `/discover?resume=${inv.id}`;
+  return `/investigate?resume=${inv.id}`;
+}
+
 export default function HomePage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -115,11 +122,11 @@ export default function HomePage() {
             {investigations.map((inv) => (
               <Link
                 key={inv.id}
-                href={`/investigate?resume=${inv.id}`}
+                href={resumeHref(inv)}
                 className="flex items-center justify-between border-l-2 bg-[var(--app-panel-alt)] px-3 py-2 text-sm hover:brightness-110"
                 style={{ borderColor: STATUS_COLOR[inv.status] || "var(--app-muted)" }}
               >
-                <span className="truncate text-[var(--app-ink-soft)]">{inv.question || "Discovery scan"}</span>
+                <span className="truncate text-[var(--app-ink-soft)]">{inv.question || (inv.mode === "discover" ? "Discovery scan" : "Investigation")}</span>
                 <span className="ml-3 shrink-0 font-mono-data text-[10px] text-[var(--app-muted)]">
                   {timeAgo(inv.created_at)}
                 </span>

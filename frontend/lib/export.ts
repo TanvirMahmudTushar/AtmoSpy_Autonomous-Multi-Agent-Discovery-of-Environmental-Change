@@ -1,4 +1,4 @@
-import { CONCERN_LABEL, SECTOR_LABEL, isHarmful } from "./insightView";
+import { CONCERN_LABEL, SECTOR_LABEL, isHarmful } from "./insightView.ts";
 import type { FindingDetail } from "./types";
 
 export function downloadTextFile(filename: string, content: string, mimeType: string) {
@@ -32,6 +32,23 @@ export function findingToCsv(finding: FindingDetail): string {
 
 export function findingCsvFilename(finding: FindingDetail): string {
   return `${slug(finding)}_timeseries.csv`;
+}
+
+/** Every month as analyzed: the raw monthly value, the normal value for that
+ * calendar month (climatology) and the anomaly (raw minus normal). Null when
+ * there is no monthly series (older findings). */
+export function findingToMonthlyCsv(finding: FindingDetail): string | null {
+  const m = finding.visualizations.timeseries?.monthly;
+  if (!m) return null;
+  const cell = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
+  const rows = m.dates.map(
+    (d, i) => `${d},${cell(m.raw[i])},${cell(m.climatology[i])},${cell(m.anomaly[i])},${cell(m.fitted?.[i])}`,
+  );
+  return [`month,${finding.variable_code},normal_for_month,anomaly,fitted_trend_on_anomaly`, ...rows].join("\n") + "\n";
+}
+
+export function findingMonthlyCsvFilename(finding: FindingDetail): string {
+  return `${slug(finding)}_monthly.csv`;
 }
 
 /** A self-contained Markdown scientific report — every field traces

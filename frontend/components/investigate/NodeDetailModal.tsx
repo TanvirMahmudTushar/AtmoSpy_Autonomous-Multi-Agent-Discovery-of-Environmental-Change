@@ -12,9 +12,9 @@ function stepTime(step: InvestigationStep): string {
 
 function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
   if (value === null || value === undefined) return <span className="text-[var(--app-muted)]">null</span>;
-  if (typeof value === "number") return <span style={{ color: "var(--app-accent-gold)" }}>{value}</span>;
+  if (typeof value === "number") return <span style={{ color: "var(--text-warning)" }}>{value}</span>;
   if (typeof value === "boolean") return <span style={{ color: "var(--app-accent-sky)" }}>{String(value)}</span>;
-  if (typeof value === "string") return <span style={{ color: "var(--chart-good)" }}>&quot;{value}&quot;</span>;
+  if (typeof value === "string") return <span style={{ color: "var(--text-good)" }}>&quot;{value}&quot;</span>;
 
   if (Array.isArray(value)) {
     if (value.length === 0) return <span className="text-[var(--app-muted)]">[]</span>;
@@ -95,7 +95,7 @@ export function NodeDetailModal({
           </div>
           <button
             onClick={onClose}
-            className="rounded-sm border border-[var(--app-hud-line)] px-2 py-1 font-display text-[9px] text-[var(--app-ink-soft)] hover:border-[var(--chart-critical)] hover:text-[var(--chart-critical)]"
+            className="rounded-sm border border-[var(--app-hud-line)] px-2 py-1 font-display text-[9px] text-[var(--app-ink-soft)] hover:border-[var(--chart-critical)] hover:text-[var(--text-critical)]"
           >
             ESC ✕
           </button>
@@ -110,7 +110,7 @@ export function NodeDetailModal({
                 <span className="font-mono-data text-[var(--app-muted)]">
                   {stepTime(s)}
                 </span>{" "}
-                <span className="uppercase" style={{ color: s.status === "error" ? "var(--chart-critical)" : s.status === "done" ? "var(--chart-good)" : "var(--app-accent-cyan)" }}>
+                <span className="uppercase" style={{ color: s.status === "error" ? "var(--text-critical)" : s.status === "done" ? "var(--text-good)" : "var(--app-accent-cyan)" }}>
                   {s.status}
                 </span>{" "}
                 <span className="text-[var(--app-ink-soft)]">{s.message}</span>

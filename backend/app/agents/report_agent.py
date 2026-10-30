@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents.state import InvestigationState
 from app.analysis.significance import classify_significance, effect_size
 from app.analysis.trend import ANALYSIS_VERSION, TrendResult
+from app.db.seed import seed_datasets_and_variables, upsert_region
 from app.models import Dataset, Finding, Provenance, Region, Report, Variable, Visualization
 from app.nasa.catalog import VARIABLES_BY_CODE, dataset_code_for_variable
 from app.nasa.registry import get_adapter
@@ -19,11 +20,23 @@ from app.services.events import StepRecorder
 from app.tools import report_tools
 
 
-async def _get_or_create_region(session: AsyncSession, region_def) -> Region:
-    row = (await session.execute(select(Region).where(Region.code == region_def.code))).scalar_one_or_none()
-    if row is None:
-        raise RuntimeError(f"Region {region_def.code} not seeded — run app.db.seed first.")
-    return row
+async def _dataset_and_variable_rows(session: AsyncSession, dataset_code: str, variable_code: str):
+    """The Dataset and Variable rows for this finding, seeding them on demand
+    (a cube built after the last seed run adds new variables)."""
+    for attempt in range(2):
+        dataset_row = (await session.execute(select(Dataset).where(Dataset.code == dataset_code))).scalar_one_or_none()
+        variable_row = None
+        if dataset_row is not None:
+            variable_row = (
+                await session.execute(
+                    select(Variable).where(Variable.dataset_id == dataset_row.id, Variable.code == variable_code)
+                )
+            ).scalar_one_or_none()
+        if variable_row is not None:
+            return dataset_row, variable_row
+        if attempt == 0:
+            await seed_datasets_and_variables(session)
+    raise RuntimeError(f"Variable {variable_code} of {dataset_code} could not be registered.")
 
 
 def _method_description(trend: TrendResult) -> str:
@@ -36,10 +49,18 @@ def _method_description(trend: TrendResult) -> str:
     )
 
 
-def _processing_description(daily: bool, dataset_name: str, trend: TrendResult) -> str:
-    steps = f"{'Daily' if daily else 'Monthly'} {dataset_name} values"
-    if daily:
-        steps += " averaged to monthly means (months with under 70% of days observed are dropped)"
+def _processing_description(daily: bool, dataset_name: str, trend: TrendResult, sampling: dict) -> str:
+    if sampling.get("method") == "area_mean":
+        steps = (
+            f"Monthly {dataset_name} values on {sampling['n_cells']} grid cells averaged over the region with "
+            f"cos(latitude) area weights (a month counts only when at least 70% of the region's area has data)"
+        )
+    else:
+        steps = f"{'Daily' if daily else 'Monthly'} {dataset_name} values at the region's centre point"
+        if sampling.get("reason"):
+            steps += f" (no regional grid: {sampling['reason']})"
+        if daily:
+            steps += ", averaged to monthly means (months with under 70% of days observed are dropped)"
     if trend.basis == "monthly_anomaly":
         steps += (
             ", the average seasonal cycle (monthly climatology over the record) subtracted to give anomalies, "
@@ -52,7 +73,7 @@ def _processing_description(daily: bool, dataset_name: str, trend: TrendResult) 
 
 def _slim_related(related: list[dict]) -> list[dict]:
     return [
-        {k: v for k, v in r.items() if k not in ("target_years", "target_values")}
+        {k: v for k, v in r.items() if k not in ("target_years", "seed_anomalies", "target_anomalies")}
         for r in related
     ]
 
@@ -95,13 +116,8 @@ async def run(session: AsyncSession, recorder: StepRecorder, state: Investigatio
 
     var_info = VARIABLES_BY_CODE[state.plan.variable_code]
     dataset_code = dataset_code_for_variable(state.plan.variable_code)
-    dataset_row = (await session.execute(select(Dataset).where(Dataset.code == dataset_code))).scalar_one()
-    variable_row = (
-        await session.execute(
-            select(Variable).where(Variable.dataset_id == dataset_row.id, Variable.code == state.plan.variable_code)
-        )
-    ).scalar_one()
-    region_row = await _get_or_create_region(session, state.region)
+    dataset_row, variable_row = await _dataset_and_variable_rows(session, dataset_code, state.plan.variable_code)
+    region_row = await upsert_region(session, state.region)
 
     facts = _build_facts(state, var_info, dataset_row, region_row)
     narrative = await report_tools.create_investigation_report(facts)
@@ -132,19 +148,23 @@ async def run(session: AsyncSession, recorder: StepRecorder, state: Investigatio
         confidence_interval=state.confidence_interval,
         significance_classification=state.significance["classification"],
         importance_note=state.importance_note or "",
-        data_quality=state.quality_report.__dict__ if state.quality_report else {},
+        # sampling: how the series represents the region (area mean or centre point)
+        data_quality={**(state.quality_report.__dict__ if state.quality_report else {}), "sampling": state.sampling},
         spatial_summary=state.opposite_trends,
         related_variables=_slim_related(state.related_variables),
         robustness={"verdict": state.robustness_verdict, "caveats": state.robustness_caveats},
         skeptic_review={"verdict": state.skeptic_verdict, "points": state.skeptic_points},
         interpretation=narrative["interpretation"],
-        limitations=narrative["limitations"] + (
-            f" [NOTE: narrative contained {len(narrative['guardrail_flags'])} number(s) not traced to computed "
-            f"data and was flagged for review: {narrative['guardrail_flags']}]"
-            if narrative.get("guardrail_flags") else ""
-        ),
+        limitations=narrative["limitations"],
         narrative_source=narrative["source"],
     )
+    if narrative.get("guardrail_flags"):
+        await recorder.emit(
+            "REPORT_AGENT", "running",
+            f"The AI-written summary quoted {len(narrative['guardrail_flags'])} number(s) that don't trace back to "
+            f"the analysis ({', '.join(narrative['guardrail_flags'][:5])}), so it was discarded and the plain "
+            "template summary was used instead.",
+        )
     session.add(finding)
     await session.flush()
     state.finding_id = finding.id
@@ -168,13 +188,12 @@ async def run(session: AsyncSession, recorder: StepRecorder, state: Investigatio
 
     if state.related_variables:
         top = state.related_variables[0]
-        common = sorted(set(state.years) & set(top["target_years"]))
-        if common:
-            y_map, t_map = dict(zip(state.years, state.values)), dict(zip(top["target_years"], top["target_values"]))
+        if top["target_years"]:
+            # Plot what was correlated: each variable's anomaly with its trend removed.
             scatter = report_tools.generate_relationship_scatter(
-                common, [y_map[y] for y in common], [t_map[y] for y in common],
-                var_info.name, top["variable_name"],
-                {"method": top["method"], "r": top["r"], "p_value": top["p_value"]},
+                top["target_years"], top["seed_anomalies"], top["target_anomalies"],
+                f"{var_info.name} (detrended anomaly)", f"{top['variable_name']} (detrended anomaly)",
+                {"method": top["method"], "r": top["r"], "p_value": top["p_value"], "q_value": top["q_value"]},
             )
             session.add(Visualization(finding_id=finding.id, investigation_id=state.investigation_id, kind="scatter", data=scatter))
             state.visualizations["scatter"] = scatter
@@ -205,7 +224,8 @@ async def run(session: AsyncSession, recorder: StepRecorder, state: Investigatio
             dataset_version=dataset_row.version,
             retrieval_time=datetime.now(timezone.utc),
             processing_method=_processing_description(
-                get_adapter(dataset_code).get_metadata().temporal_resolution_days <= 1.0, dataset_row.name, trend_result
+                get_adapter(dataset_code).get_metadata().temporal_resolution_days <= 1.0, dataset_row.name,
+                trend_result, state.sampling,
             ),
             statistical_method=finding.statistical_method,
             url=state.point_series.source_url,
@@ -214,10 +234,14 @@ async def run(session: AsyncSession, recorder: StepRecorder, state: Investigatio
 
     await session.commit()
 
+    change = (
+        f"{finding.percent_change:+.1f}% change"
+        if finding.percent_change is not None
+        else f"total change {finding.total_change:+.3g} {var_info.units}"
+    )
     await recorder.emit(
         "REPORT_AGENT", "done",
-        f"Finding saved: {finding.title} — {finding.significance_classification}, "
-        f"{finding.percent_change:+.1f}% change." if finding.percent_change is not None else "Finding saved.",
+        f"Finding saved: {finding.title} — {finding.significance_classification}, {change}.",
         {"finding_id": str(finding.id)},
     )
 

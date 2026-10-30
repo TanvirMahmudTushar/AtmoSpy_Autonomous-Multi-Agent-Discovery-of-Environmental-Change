@@ -13,6 +13,7 @@ import { PixelSprite } from "@/components/pixel/PixelSprite";
 import { summaryChange } from "@/lib/changeModel";
 import {
   CONCERN_COLOR,
+  CONCERN_TEXT_COLOR,
   CONCERN_LABEL,
   CONCERN_LEVELS,
   CONFIDENCE_LABEL,
@@ -142,7 +143,7 @@ export function ImpactChain({ finding }: { finding: FindingDetail }) {
 
   const change = summaryChange(finding);
   const harmful = isHarmful(insight.concern);
-  const color = CONCERN_COLOR[insight.concern];
+  const color = CONCERN_TEXT_COLOR[insight.concern];
   const actionTitle = harmful ? "How to reduce it" : "How to prepare";
 
   return (

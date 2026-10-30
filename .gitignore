@@ -92,9 +92,33 @@ supabase/.temp/
 terraform.tfstate*
 
 # Build output and caches
+data/cubes/
 .next/
 out/
 build/
 coverage/
 .mypy_cache/
 .ruff_cache/
+
+# NASA Earthdata / OPeNDAP login files (earthaccess, pydap, curl, wget)
+.urs_cookies
+.dodsrc
+.edl_token
+earthdata*.json
+cookies.txt
+*.cookies
+*.har
+
+# Other credential stores and keys
+.git-credentials
+.envrc
+.ssh/
+*.gpg
+*.asc
+*.kdbx
+*.ovpn
+kubeconfig
+.docker/config.json
+.htpasswd
+.secrets/
+supabase/.env*

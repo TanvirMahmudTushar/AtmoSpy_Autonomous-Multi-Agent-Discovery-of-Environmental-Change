@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +10,7 @@ from app.db.session import get_db
 from app.knowledge.insight import build_insight, concern_for_summary
 from app.models import Finding, Investigation, Provenance, Region, User, Variable, Visualization
 from app.schemas.api import FindingDetailOut, FindingSummaryOut
+from app.services.notebook import build_notebook
 
 router = APIRouter(prefix="/findings", tags=["findings"])
 
@@ -65,6 +67,7 @@ async def list_findings(
         FindingSummaryOut(
             id=f.id, title=f.title, variable_code=v.code, variable_name=v.name,
             region_code=r.code, region_name=r.name, period_start=f.period_start, period_end=f.period_end,
+            region_bbox=[r.min_lat, r.max_lat, r.min_lon, r.max_lon],
             trend_per_year=f.trend_per_year, trend_units=f.trend_units, total_change=f.total_change,
             percent_change=f.percent_change, effect_size=f.effect_size,
             p_value=f.p_value, significance_classification=f.significance_classification,
@@ -119,11 +122,13 @@ async def get_finding(finding_id: uuid.UUID, session: AsyncSession = Depends(get
         spatial_summary=f.spatial_summary,
         change_points=(visualizations.get("timeseries") or {}).get("change_points"),
         related_variables=f.related_variables,
+        sampling=(f.data_quality or {}).get("sampling"),
     )
 
     return FindingDetailOut(
         id=f.id, title=f.title, variable_code=v.code, variable_name=v.name,
         region_code=r.code, region_name=r.name, period_start=f.period_start, period_end=f.period_end,
+        region_bbox=[r.min_lat, r.max_lat, r.min_lon, r.max_lon],
         trend_per_year=f.trend_per_year, trend_units=f.trend_units, total_change=f.total_change,
         percent_change=f.percent_change, effect_size=f.effect_size,
         p_value=f.p_value, significance_classification=f.significance_classification,
@@ -138,3 +143,30 @@ async def get_finding(finding_id: uuid.UUID, session: AsyncSession = Depends(get
         analysis_version=f.analysis_version, temporal_basis=f.temporal_basis, trend_details=f.trend_details,
         detectability=f.detectability, seasonal_trends=f.seasonal_trends,
     )
+
+
+@router.get("/{finding_id}/notebook")
+async def get_finding_notebook(finding_id: uuid.UUID, session: AsyncSession = Depends(get_db)):
+    """A Jupyter notebook that recomputes this finding's statistics from the
+    data it analyzed (analysis-version-2 findings)."""
+    row = (
+        await session.execute(
+            select(Finding, Variable, Region)
+            .join(Variable, Finding.variable_id == Variable.id)
+            .join(Region, Finding.region_id == Region.id)
+            .where(Finding.id == finding_id)
+        )
+    ).first()
+    if row is None:
+        raise HTTPException(404, "Finding not found")
+    f, v, r = row
+    if (f.analysis_version or 1) < 2:
+        raise HTTPException(409, "Notebooks are available for findings analyzed with the current method only.")
+    viz_rows = (await session.execute(select(Visualization).where(Visualization.finding_id == finding_id))).scalars().all()
+    prov = (await session.execute(select(Provenance).where(Provenance.finding_id == finding_id))).scalar_one_or_none()
+    notebook = build_notebook(
+        f, v.code, r.name, {viz.kind: viz.data for viz in viz_rows},
+        {"processing_method": prov.processing_method, "url": prov.url} if prov else None,
+    )
+    filename = f"{v.code}_{r.code}_{f.period_start.year}-{f.period_end.year}.ipynb".lower()
+    return JSONResponse(notebook, headers={"Content-Disposition": f'attachment; filename="{filename}"'})

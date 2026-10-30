@@ -104,6 +104,7 @@ export function TimeSeriesChart({ data }: { data: TimeSeriesChartData }) {
               type="button"
               role="tab"
               aria-selected={view === v}
+              data-tour-view={v}
               onClick={() => setView(v)}
               className={`border-2 px-2.5 py-1 font-display text-[8px] ${
                 view === v
@@ -213,7 +214,7 @@ function AnnualView({ data }: { data: TimeSeriesChartData }) {
         </ComposedChart>
       </ResponsiveContainer>
       {data.change_points.length > 0 && (
-        <p className="mt-1 text-xs text-[var(--chart-muted)]">
+        <p className="mt-1 text-xs text-[var(--text-chart-muted)]">
           ⬤ marks a detected change point (PELT algorithm) — a shift in the mean level, not necessarily the start of
           the long-run trend.
         </p>
@@ -364,7 +365,7 @@ function AnomalyView({ data, monthly }: { data: TimeSeriesChartData; monthly: Mo
         </ComposedChart>
       </ResponsiveContainer>
       {!hasTrend && (
-        <p className="mt-1 text-xs text-[var(--chart-muted)]">
+        <p className="mt-1 text-xs text-[var(--text-chart-muted)]">
           The trend for this finding was tested on yearly averages, so no trend line is drawn on the monthly anomalies.
         </p>
       )}

@@ -1,5 +1,7 @@
 """Agent 4 — Temporal Trend Agent."""
 
+import asyncio
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.state import InvestigationState
@@ -12,13 +14,24 @@ from app.tools import analysis_tools
 MIN_RECORD_YEARS = 8
 
 
+def _analyze(bundle, years: list[int], values: list[float]):
+    return (
+        analysis_tools.calculate_primary_trend(bundle),
+        analysis_tools.calculate_seasonal_trends(bundle),
+        analysis_tools.detect_change_points(years, values),
+        analysis_tools.calculate_persistence(years, values),
+    )
+
+
 async def run(session: AsyncSession, recorder: StepRecorder, state: InvestigationState) -> InvestigationState:
     await recorder.emit(
         "TREND_AGENT", "running",
         "Building monthly means, removing the seasonal cycle, and calculating the trend...",
     )
 
-    bundle = analysis_tools.prepare_monthly(state.point_series)
+    # CPU-bound work runs in a worker thread so the server keeps streaming
+    # progress (and answering other requests) meanwhile.
+    bundle = await asyncio.to_thread(analysis_tools.prepare_monthly, state.point_series)
     state.monthly = bundle
     state.years = [int(y) for y in bundle.annual.index]
     state.values = [float(v) for v in bundle.annual.values]
@@ -32,13 +45,15 @@ async def run(session: AsyncSession, recorder: StepRecorder, state: Investigatio
         )
         return state
 
-    trend_result = analysis_tools.calculate_primary_trend(bundle)
-    state.trend_result = trend_result
-    state.seasonal_trends = analysis_tools.calculate_seasonal_trends(bundle)
-    state.change_points = analysis_tools.detect_change_points(state.years, state.values)
-    state.persistence = analysis_tools.calculate_persistence(state.years, state.values)
-
     var_info = VARIABLES_BY_CODE[state.plan.variable_code]
+    trend_result, state.seasonal_trends, state.change_points, state.persistence = await asyncio.to_thread(
+        _analyze, bundle, state.years, state.values
+    )
+    if var_info.scale == "interval":
+        # Zero is arbitrary (degrees Celsius, anomalies): "+38% warmer" is meaningless.
+        trend_result.percent_change = None
+    state.trend_result = trend_result
+
     direction = "increasing" if trend_result.sen_slope_per_year > 0 else "decreasing"
     pct = f", {trend_result.percent_change:+.1f}% total change" if trend_result.percent_change is not None else ""
     basis = (

@@ -9,8 +9,8 @@ import { directionColor } from "./ChangeGlyph";
 
 const VERDICT: Record<WatchVerdict, { text: string; color: string }> = {
   first: { text: "First check — nothing to compare yet", color: "var(--app-muted)" },
-  flipped: { text: "Direction flipped since the last check", color: "var(--chart-warning)" },
-  newly_significant: { text: "Newly statistically significant", color: "var(--chart-good)" },
+  flipped: { text: "Direction flipped since the last check", color: "var(--text-warning)" },
+  newly_significant: { text: "Newly statistically significant", color: "var(--text-good)" },
   lost_significance: { text: "No longer statistically significant", color: "var(--app-accent-clay)" },
   consistent: { text: "Consistent with the previous check", color: "var(--app-muted)" },
 };

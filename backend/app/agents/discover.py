@@ -74,7 +74,11 @@ def _criteria(finding: Finding, q_value: float) -> dict:
     """q_value is the finding's p-value after Benjamini-Hochberg adjustment
     across every finding in this scan: screening 16 candidates at p < 0.05
     would otherwise expect ~1 'significant' trend by chance alone."""
-    magnitude = min(abs(finding.percent_change or 0.0) / 50.0, 1.0)  # 50% change treated as "maxed out"
+    # Magnitude is the effect size (total change / year-to-year variability),
+    # which means the same thing for every variable; percent change is
+    # meaningless for interval scales like degrees Celsius. An effect size of
+    # 2 is treated as "maxed out". (Key name kept for stored scores.)
+    magnitude = min((finding.effect_size or 0.0) / 2.0, 1.0)
     sig_strength = min(-math.log10(max(q_value, 1e-10)) / 5.0, 1.0)  # q=1e-5 -> 1.0
     completeness = (finding.data_quality or {}).get("completeness", 0.0)
     verdict = (finding.robustness or {}).get("verdict")

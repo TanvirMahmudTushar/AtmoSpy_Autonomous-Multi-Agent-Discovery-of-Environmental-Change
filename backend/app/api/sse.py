@@ -20,41 +20,53 @@ from app.services.events import DONE_SENTINEL, EVENT_BUS
 STREAM_TIMEOUT_SECONDS = 600
 
 
+def _key(event: dict) -> tuple:
+    # seq restarts per StepRecorder (scans and Discover use several per
+    # investigation), so it is unique only together with agent and message.
+    return event.get("seq"), event.get("agent"), event.get("message")
+
+
 async def event_stream(investigation_id: uuid.UUID):
-    async with AsyncSessionLocal() as session:
-        investigation = (
-            await session.execute(select(Investigation).where(Investigation.id == investigation_id))
-        ).scalar_one_or_none()
-        if investigation is None:
-            yield f"event: error\ndata: {json.dumps({'message': 'investigation not found'})}\n\n"
-            return
-
-        past_steps = (
-            (
-                await session.execute(
-                    select(InvestigationStep)
-                    .where(InvestigationStep.investigation_id == investigation_id)
-                    .order_by(InvestigationStep.seq)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        for step in past_steps:
-            payload = {
-                "agent": step.agent, "status": step.status, "message": step.message,
-                "detail": step.detail, "seq": step.seq, "ts": step.created_at.isoformat(),
-            }
-            yield f"data: {json.dumps(payload)}\n\n"
-
-        terminal = investigation.status in ("completed", "failed", "insufficient_data")
-
-    if terminal:
-        yield f"event: done\ndata: {json.dumps({'status': investigation.status})}\n\n"
-        return
-
+    # Subscribe BEFORE reading history: an event emitted between the history
+    # read and a later subscribe would otherwise be lost — and if it was the
+    # final "done", the client would wait out the whole stream timeout.
+    # Live events already sent as history are skipped.
     queue = EVENT_BUS.subscribe(investigation_id)
     try:
+        async with AsyncSessionLocal() as session:
+            investigation = (
+                await session.execute(select(Investigation).where(Investigation.id == investigation_id))
+            ).scalar_one_or_none()
+            if investigation is None:
+                yield f"event: error\ndata: {json.dumps({'message': 'investigation not found'})}\n\n"
+                return
+
+            past_steps = (
+                (
+                    await session.execute(
+                        select(InvestigationStep)
+                        .where(InvestigationStep.investigation_id == investigation_id)
+                        .order_by(InvestigationStep.created_at, InvestigationStep.seq)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            sent: set[tuple] = set()
+            for step in past_steps:
+                payload = {
+                    "agent": step.agent, "status": step.status, "message": step.message,
+                    "detail": step.detail, "seq": step.seq, "ts": step.created_at.isoformat(),
+                }
+                sent.add(_key(payload))
+                yield f"data: {json.dumps(payload)}\n\n"
+
+            terminal = investigation.status in ("completed", "failed", "insufficient_data")
+
+        if terminal:
+            yield f"event: done\ndata: {json.dumps({'status': investigation.status})}\n\n"
+            return
+
         elapsed = 0
         while elapsed < STREAM_TIMEOUT_SECONDS:
             try:
@@ -66,6 +78,8 @@ async def event_stream(investigation_id: uuid.UUID):
             if event is DONE_SENTINEL or event.get("status") == "stream_complete":
                 yield f"event: done\ndata: {json.dumps({'status': 'completed'})}\n\n"
                 return
+            if _key(event) in sent:
+                continue
             yield f"data: {json.dumps(event)}\n\n"
     finally:
         EVENT_BUS.unsubscribe(investigation_id, queue)

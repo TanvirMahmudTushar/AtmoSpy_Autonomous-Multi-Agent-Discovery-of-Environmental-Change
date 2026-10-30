@@ -1,4 +1,3 @@
-import secrets
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,6 +13,9 @@ from app.models import User
 from app.schemas.auth import LoginRequest, SignupRequest, TokenResponse, UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# Not a bcrypt hash, so bcrypt.checkpw raises and verify_password returns False.
+GUEST_PASSWORD_HASH = "!guest"
 
 
 @router.post("/signup", response_model=TokenResponse, status_code=201, dependencies=[Depends(rate_limit(20, 60))])
@@ -55,10 +57,11 @@ async def guest_login(session: AsyncSession = Depends(get_db)):
     """Creates a brand-new throwaway account and logs into it immediately —
     no form, no email. A fresh row every call, never a shared account
     (two guests sharing one row would see each other's watches/investigations
-    history). The random password is generated only so it satisfies the
-    schema's NOT NULL constraint; nothing needs to know it, since this
-    account is only ever reached via the token this endpoint returns, never
-    via a future /login call.
+    history). The password hash is a fixed non-bcrypt marker that only
+    satisfies the schema's NOT NULL constraint: verify_password rejects it,
+    so this account is only ever reached via the token this endpoint
+    returns, never via /login. (Bcrypt-hashing a random throwaway password
+    took seconds of CPU on the free-tier instance for no benefit.)
 
     is_demo=True is otherwise inert today (grep confirms nothing in the
     backend branches on it) — it's here so a guest row is honestly
@@ -68,7 +71,7 @@ async def guest_login(session: AsyncSession = Depends(get_db)):
     suffix = uuid.uuid4().hex[:10]
     user = User(
         email=f"guest-{suffix}@guest.local",
-        password_hash=hash_password(secrets.token_urlsafe(32)),
+        password_hash=GUEST_PASSWORD_HASH,
         display_name=f"Guest-{suffix[:5]}",
         is_demo=True,
     )

@@ -21,6 +21,16 @@ const STATUS_COLOR: Record<FlowNodeStatus, string> = {
   skipped: "var(--app-muted)",
 };
 
+// The status label is text, so it uses the text-safe tokens (WCAG AA);
+// the border and glow keep the chart colours above.
+const TEXT_COLOR: Record<FlowNodeStatus, string> = {
+  pending: "var(--app-muted)",
+  running: "var(--app-accent-cyan)",
+  done: "var(--text-good)",
+  error: "var(--text-critical)",
+  skipped: "var(--app-muted)",
+};
+
 export function AgentFlowNode({ data }: { data: AgentFlowNodeData }) {
   const color = STATUS_COLOR[data.status];
   const pulsing = data.status === "running";
@@ -48,7 +58,7 @@ export function AgentFlowNode({ data }: { data: AgentFlowNodeData }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-display text-[8px] leading-tight text-[var(--app-ink)]">{data.label}</div>
-          <div className="font-mono-data text-[9px] uppercase tracking-wide" style={{ color }}>
+          <div className="font-mono-data text-[9px] uppercase tracking-wide" style={{ color: TEXT_COLOR[data.status] }}>
             {data.count !== undefined ? `${data.count} active` : data.status}
           </div>
         </div>

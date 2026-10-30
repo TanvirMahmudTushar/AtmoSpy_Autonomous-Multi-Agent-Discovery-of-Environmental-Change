@@ -10,8 +10,8 @@ export function SignificanceBadge({ classification }: { classification: "statist
       className={cn(
         "inline-flex items-center gap-1.5 rounded-sm border-2 px-2 py-1 text-[9px] font-display",
         significant
-          ? "border-[var(--chart-good)] text-[var(--chart-good)]"
-          : "border-[var(--chart-muted)] text-[var(--chart-muted)]"
+          ? "border-[var(--chart-good)] text-[var(--text-good)]"
+          : "border-[var(--chart-muted)] text-[var(--text-chart-muted)]"
       )}
     >
       {significant ? <CheckCircle2 size={12} /> : <CircleDashed size={12} />}

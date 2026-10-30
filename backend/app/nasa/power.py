@@ -1,11 +1,12 @@
 """Adapter for NASA POWER (Prediction Of Worldwide Energy Resources).
 
-Public REST API, no authentication. Backed by MERRA-2 reanalysis and
-GLDAS-derived land-surface fields, daily since 1981. We use the
-"Agroclimatology" community, which conveniently exposes meteorological
-variables (temperature, precipitation, humidity, radiation, wind) *and*
-GLDAS Noah root-zone/surface soil wetness in the same API — giving us a
-genuinely interconnected variable set without needing SMAP/GRACE auth.
+Public REST API, no authentication. Meteorology comes from MERRA-2
+reanalysis (daily since 1981) and solar radiation from GEWEX SRB / CERES.
+We use the "Agroclimatology" community, which conveniently exposes
+meteorological variables (temperature, precipitation, humidity, radiation,
+wind) *and* MERRA-2's land-model root-zone/surface soil wetness in the same
+API — giving us a genuinely interconnected variable set without needing
+SMAP/GRACE auth.
 
 Docs: https://power.larc.nasa.gov/docs/services/api/
 """
@@ -40,11 +41,11 @@ POWER_VARIABLES = [
     VariableInfo("RH2M", "Relative Humidity at 2 Meters", "%",
                  "Relative humidity at 2 meters above the surface.", 0, 100),
     VariableInfo("GWETROOT", "Root Zone Soil Wetness", "fraction",
-                 "GLDAS Noah root-zone soil wetness, 0 (dry) to 1 (saturated).", 0, 1),
+                 "MERRA-2 land-model root-zone soil wetness, 0 (dry) to 1 (saturated).", 0, 1),
     VariableInfo("GWETTOP", "Surface Soil Wetness", "fraction",
-                 "GLDAS Noah surface-layer soil wetness, 0 (dry) to 1 (saturated).", 0, 1),
+                 "MERRA-2 land-model surface-layer soil wetness, 0 (dry) to 1 (saturated).", 0, 1),
     VariableInfo("GWETPROF", "Profile Soil Wetness", "fraction",
-                 "GLDAS Noah whole-column soil wetness, 0 (dry) to 1 (saturated).", 0, 1),
+                 "MERRA-2 land-model whole-column soil wetness, 0 (dry) to 1 (saturated).", 0, 1),
     VariableInfo("ALLSKY_SFC_SW_DWN", "All Sky Surface Shortwave Downward Irradiance",
                  "kW-hr/m^2/day", "All-sky insolation incident on a horizontal surface.", 0, 40),
     VariableInfo("WS2M", "Wind Speed at 2 Meters", "m/s",
@@ -72,7 +73,7 @@ class PowerAdapter(NASADataAdapter):
             provider="NASA Langley Research Center",
             description=(
                 "Global, gap-free daily meteorological and land-surface data derived from "
-                "MERRA-2 reanalysis and GLDAS Noah land-surface model output, available from "
+                "MERRA-2 reanalysis (meteorology and land surface) and GEWEX SRB / CERES (solar), available from "
                 "1981 to near-present with no authentication required."
             ),
             base_url=self._base_url,
@@ -236,12 +237,12 @@ class PowerAdapter(NASADataAdapter):
             dates: list[date] = []
             values: list[float] = []
             for key in sorted(raw.keys()):
-                if not key.endswith("13"):
+                if key.endswith("13"):  # the annual mean; we keep the months
                     continue
                 val = raw[key]
                 if val == FILL_VALUE:
                     continue
-                dates.append(date(int(key[:4]), 7, 1))
+                dates.append(date(int(key[:4]), int(key[4:6]), 1))
                 values.append(float(val))
             if dates:
                 cells.append(GridCell(lat=lat, lon=lon, dates=dates, values=values))

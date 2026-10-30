@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, eventsUrl } from "@/lib/api";
 import { useAgentStream } from "@/lib/useAgentStream";
 import { useStoredId } from "@/lib/useStoredId";
@@ -18,7 +19,25 @@ import type { FindingSummary } from "@/lib/types";
 const STORAGE_KEY = "atmospy:discover-id";
 
 export default function DiscoverPage() {
+  return (
+    <Suspense fallback={null}>
+      <DiscoverPageInner />
+    </Suspense>
+  );
+}
+
+function DiscoverPageInner() {
   const [investigationId, setInvestigationId] = useStoredId(STORAGE_KEY);
+  const resume = useSearchParams().get("resume");
+  const router = useRouter();
+
+  // ?resume=<id> (from the home dashboard) re-attaches to that past scan,
+  // then the parameter is dropped so starting a new scan isn't overridden.
+  useEffect(() => {
+    if (!resume) return;
+    setInvestigationId(resume);
+    router.replace("/discover");
+  }, [resume, router, setInvestigationId]);
   const [starting, setStarting] = useState(false);
   const [findings, setFindings] = useState<FindingSummary[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -95,7 +114,7 @@ export default function DiscoverPage() {
 
       {loadError && (
         <Panel className="mt-6 border-[var(--chart-critical)]">
-          <p className="text-sm text-[var(--chart-critical)]">{loadError}</p>
+          <p className="text-sm text-[var(--text-critical)]">{loadError}</p>
         </Panel>
       )}
 
@@ -117,7 +136,7 @@ export default function DiscoverPage() {
           </div>
           {findings.length === 0 && stream.finalStatus === "failed" && (
             <Panel className="mb-4 border-[var(--chart-critical)]">
-              <p className="text-sm text-[var(--chart-critical)]">
+              <p className="text-sm text-[var(--text-critical)]">
                 This scan did not finish, most likely because the server restarted while it was running. Start a new
                 scan to try again.
               </p>

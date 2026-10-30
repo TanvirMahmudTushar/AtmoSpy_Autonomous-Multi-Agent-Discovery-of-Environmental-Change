@@ -1,0 +1,444 @@
+# Variable catalog: plain-language learning metadata for every variable the
+# app can analyze, plus the product definitions for gridded "cube" variables.
+#
+# Fields (all optional except where noted):
+#   definition      what it is, in at most two plain sentences (for students)
+#   why_it_matters  why a trend in it would matter
+#   scale           interval | ratio. "interval" means zero is arbitrary
+#                   (degrees Celsius), so a percent change is meaningless.
+#   domain          land | ocean | atmosphere | water
+#   place_tags      kinds of place where it is a good first thing to check:
+#                   city, desert, rainforest, coast, ice, ocean, farmland,
+#                   mountains, river_basin
+#   source_label    short provenance shown next to the variable
+#   coverage_start  first full year of data
+#   known_breaks    [year, note] pairs: changes in instruments or inputs that
+#                   can create a step that looks like a trend
+#
+# Cube-only fields: product (short_name, version, variable, level_hpa),
+# convert (scale, offset applied after regridding), valid_range,
+# grid_res (default 1 degree), min_valid_days (daily products),
+# source_grid (fallback grid geometry).
+#
+# Cube variables (those with a `product` block) are read from analysis-ready
+# monthly cubes built offline by scripts/build_cube.py. DOIs and CMR concept
+# ids are read from CMR at build time and stored in each cube's metadata,
+# never typed here.
+
+place_tags: [city, desert, rainforest, coast, ice, ocean, farmland, mountains, river_basin]
+
+datasets:
+  MERRA2:
+    name: MERRA-2 reanalysis (NASA GMAO)
+    provider: NASA GES DISC
+    description: >-
+      Modern-Era Retrospective analysis for Research and Applications, Version 2: a global
+      model of the atmosphere and land that is continuously corrected with satellite and
+      ground observations, monthly since 1980.
+    version: "5.12.4"
+    retry_floor_year: 1981
+  GPM_IMERG:
+    name: GPM IMERG Final monthly precipitation
+    provider: NASA GES DISC
+    description: >-
+      Integrated Multi-satellitE Retrievals for GPM: rainfall and snowfall merged from a
+      constellation of satellite microwave and infrared sensors and calibrated to rain gauges.
+    version: "07"
+    retry_floor_year: 2001
+  GLDAS:
+    name: GLDAS Noah land surface model, monthly
+    provider: NASA GES DISC
+    description: >-
+      Global Land Data Assimilation System: a land-surface model driven by observed weather,
+      estimating soil moisture, evaporation, runoff and snow over land since 2000.
+    version: "2.1"
+    retry_floor_year: 2001
+  AIRS:
+    name: AIRS Level 3 monthly (Aqua)
+    provider: NASA GES DISC
+    description: >-
+      Atmospheric Infrared Sounder on the Aqua satellite: measures temperature and humidity
+      through the depth of the atmosphere, monthly since September 2002.
+    version: "7.0"
+    retry_floor_year: 2003
+  OMI:
+    name: OMI Level 3 (Aura)
+    provider: NASA GES DISC
+    description: >-
+      Ozone Monitoring Instrument on the Aura satellite: measures ozone and air pollutants
+      such as nitrogen dioxide from space every day since late 2004.
+    version: "004"
+    retry_floor_year: 2005
+
+variables:
+  # ---------------------------------------------------------------- NASA POWER
+  T2M:
+    family: air_temperature
+    definition: The temperature of the air about two metres above the ground, the height of a weather station thermometer.
+    why_it_matters: Warming air changes heat stress, growing seasons, snowmelt and energy demand.
+    scale: interval
+    domain: atmosphere
+    place_tags: [city, desert, ice, mountains, farmland]
+    source_label: NASA POWER (from MERRA-2 reanalysis)
+    coverage_start: 1981
+  T2M_MAX:
+    family: air_temperature
+    definition: The hottest air temperature of each day, two metres above the ground.
+    why_it_matters: Hotter daytime peaks drive heatwaves, crop stress and wildfire risk.
+    scale: interval
+    domain: atmosphere
+    place_tags: [city, desert, farmland]
+    source_label: NASA POWER (from MERRA-2 reanalysis)
+    coverage_start: 1981
+  T2M_MIN:
+    family: air_temperature
+    definition: The coldest air temperature of each day, usually just before dawn.
+    why_it_matters: Warmer nights give less relief from heat and affect frost, pests and health.
+    scale: interval
+    domain: atmosphere
+    place_tags: [city, desert, mountains]
+    source_label: NASA POWER (from MERRA-2 reanalysis)
+    coverage_start: 1981
+  TS:
+    family: surface_temperature
+    definition: The temperature of the ground or water surface itself (the "skin"), not the air above it.
+    why_it_matters: Surface temperature controls evaporation, snow and ice melt, and how much heat goes back into the air.
+    scale: interval
+    domain: land
+    place_tags: [desert, city, ice]
+    source_label: NASA POWER (from MERRA-2 reanalysis)
+    coverage_start: 1981
+  PRECTOTCORR:
+    family: precipitation
+    definition: How much rain and snow falls, as the depth of water it would make each day, corrected with rain-gauge data.
+    why_it_matters: Rainfall feeds rivers, crops and drinking water; changes bring drought or floods.
+    scale: ratio
+    domain: water
+    place_tags: [rainforest, desert, farmland, river_basin, coast]
+    source_label: NASA POWER (from MERRA-2 and GPCP)
+    coverage_start: 1981
+  RH2M:
+    family: humidity
+    definition: How close the air is to being saturated with water vapour, as a percentage.
+    why_it_matters: Humidity affects comfort, heat stress, plant water use and cloud formation.
+    scale: ratio
+    domain: atmosphere
+    place_tags: [rainforest, coast, city]
+    source_label: NASA POWER (from MERRA-2 reanalysis)
+    coverage_start: 1981
+  GWETROOT:
+    family: soil_moisture
+    definition: How wet the soil is down where plant roots reach, from 0 (completely dry) to 1 (saturated).
+    why_it_matters: Root-zone moisture decides whether crops and forests have water, and signals drought.
+    scale: ratio
+    domain: land
+    place_tags: [farmland, rainforest, river_basin, desert]
+    source_label: NASA POWER (from the land model in MERRA-2)
+    coverage_start: 1981
+  GWETTOP:
+    family: soil_moisture
+    definition: How wet the top few centimetres of soil are, from 0 (completely dry) to 1 (saturated).
+    why_it_matters: Surface wetness responds quickly to rain and heat, so it is an early drought signal.
+    scale: ratio
+    domain: land
+    place_tags: [farmland, desert, river_basin]
+    source_label: NASA POWER (from the land model in MERRA-2)
+    coverage_start: 1981
+  GWETPROF:
+    family: soil_moisture
+    definition: How wet the whole soil column is, from the surface down to bedrock, from 0 (dry) to 1 (saturated).
+    why_it_matters: Deep soil water is a slow store that buffers droughts over months to years.
+    scale: ratio
+    domain: land
+    place_tags: [farmland, river_basin]
+    source_label: NASA POWER (from the land model in MERRA-2)
+    coverage_start: 1981
+  ALLSKY_SFC_SW_DWN:
+    family: sunlight
+    definition: How much sunlight energy reaches the ground each day, including the effect of clouds and haze.
+    why_it_matters: Sunlight powers plant growth, solar panels and surface heating; haze and cloud changes alter it.
+    scale: ratio
+    domain: atmosphere
+    place_tags: [city, desert, farmland]
+    source_label: NASA POWER (from GEWEX SRB and CERES)
+    coverage_start: 1984
+    known_breaks:
+      - [2001, "The solar data source changes from GEWEX SRB to CERES SYN1deg in 2001, which can produce a step."]
+  WS2M:
+    family: wind
+    definition: The average wind speed two metres above the ground.
+    why_it_matters: Wind affects evaporation, dust storms, wind energy and how pollution spreads.
+    scale: ratio
+    domain: atmosphere
+    place_tags: [desert, coast, ice]
+    source_label: NASA POWER (from MERRA-2 reanalysis)
+    coverage_start: 1981
+
+  # ------------------------------------------------- existing live adapters
+  lwe_thickness:
+    family: water_storage
+    definition: How much extra or missing water is stored in a region (groundwater, soil, snow, lakes and ice together), measured as a depth of water, from tiny changes in Earth's gravity.
+    why_it_matters: Falling water storage can reveal groundwater being pumped faster than rain refills it, or ice sheets melting.
+    scale: interval
+    domain: water
+    place_tags: [farmland, river_basin, ice, desert]
+    source_label: GRACE and GRACE-FO satellites (JPL mascons)
+    coverage_start: 2003
+    known_breaks:
+      - [2017, "About 11 months are missing between the GRACE and GRACE-FO missions (mid-2017 to mid-2018)."]
+  soil_moisture:
+    family: soil_moisture
+    definition: How much water is in the top 5 centimetres of soil, measured from space by the soil's natural microwave glow.
+    why_it_matters: Surface soil moisture shows drought developing and how wet the ground is before storms.
+    scale: ratio
+    domain: land
+    place_tags: [farmland, desert, river_basin]
+    source_label: SMAP satellite (L3 radiometer)
+    coverage_start: 2016
+
+  # ----------------------------------------------------- cube variables
+  M2_T2M:
+    family: air_temperature
+    name: Air temperature at 2 m (MERRA-2)
+    units: degC
+    dataset: MERRA2
+    product: {short_name: M2TMNXSLV, version: "5.12.4", variable: T2M}
+    convert: {scale: 1.0, offset: -273.15}
+    valid_range: [-90, 60]
+    definition: The temperature of the air about two metres above the ground, from NASA's MERRA-2 model of the atmosphere.
+    why_it_matters: Warming air changes heat stress, growing seasons, snowmelt and energy demand.
+    scale: interval
+    domain: atmosphere
+    place_tags: [city, desert, ice, mountains, farmland, ocean]
+    source_label: MERRA-2 reanalysis
+    coverage_start: 1980
+  M2_TQV:
+    family: humidity
+    name: Total water vapour in the air (MERRA-2)
+    units: mm
+    dataset: MERRA2
+    product: {short_name: M2TMNXSLV, version: "5.12.4", variable: TQV}
+    convert: {scale: 1.0, offset: 0.0}
+    valid_range: [0, 100]
+    definition: All the water vapour in a column of air from the ground to space, as the depth of water it would make if it all rained out.
+    why_it_matters: Warmer air holds more water vapour, which fuels heavier downpours and traps more heat.
+    scale: ratio
+    domain: atmosphere
+    place_tags: [rainforest, ocean, coast, desert]
+    source_label: MERRA-2 reanalysis
+    coverage_start: 1980
+  M2_SLP:
+    family: pressure
+    name: Sea-level air pressure (MERRA-2)
+    units: hPa
+    dataset: MERRA2
+    product: {short_name: M2TMNXSLV, version: "5.12.4", variable: SLP}
+    convert: {scale: 0.01, offset: 0.0}
+    valid_range: [850, 1100]
+    definition: The weight of the air above a place, adjusted to sea level so places at different heights can be compared.
+    why_it_matters: Shifts in pressure patterns move storm tracks, monsoons and the paths of rain.
+    scale: ratio
+    domain: atmosphere
+    place_tags: [ocean, coast, ice]
+    source_label: MERRA-2 reanalysis
+    coverage_start: 1980
+  M2_T850:
+    family: upper_air_temperature
+    name: Air temperature at 850 hPa (about 1.5 km up, MERRA-2)
+    units: degC
+    dataset: MERRA2
+    product: {short_name: M2IMNPASM, version: "5.12.4", variable: T, level_hpa: 850}
+    convert: {scale: 1.0, offset: -273.15}
+    valid_range: [-90, 50]
+    level_hpa: 850
+    definition: The air temperature about 1.5 kilometres above sea level, above most of the daily heating and cooling at the ground.
+    why_it_matters: Shows whether the lower atmosphere as a whole is warming, not just the air near the surface.
+    scale: interval
+    domain: atmosphere
+    place_tags: [ocean, ice, mountains]
+    source_label: MERRA-2 reanalysis
+    coverage_start: 1980
+    known_breaks:
+      - [1998, "Satellite temperature sounders changed from MSU/SSU to AMSU in 1998-1999; upper-air values may step."]
+  M2_T500:
+    family: upper_air_temperature
+    name: Air temperature at 500 hPa (about 5.5 km up, MERRA-2)
+    units: degC
+    dataset: MERRA2
+    product: {short_name: M2IMNPASM, version: "5.12.4", variable: T, level_hpa: 500}
+    convert: {scale: 1.0, offset: -273.15}
+    valid_range: [-90, 20]
+    level_hpa: 500
+    definition: The air temperature about 5.5 kilometres up, halfway through the mass of the atmosphere.
+    why_it_matters: The middle of the troposphere is where greenhouse warming shows clearly, away from local surface effects.
+    scale: interval
+    domain: atmosphere
+    place_tags: [ocean, mountains, ice, desert]
+    source_label: MERRA-2 reanalysis
+    coverage_start: 1980
+    known_breaks:
+      - [1998, "Satellite temperature sounders changed from MSU/SSU to AMSU in 1998-1999; upper-air values may step."]
+  M2_T250:
+    family: upper_air_temperature
+    name: Air temperature at 250 hPa (about 10 km up, MERRA-2)
+    units: degC
+    dataset: MERRA2
+    product: {short_name: M2IMNPASM, version: "5.12.4", variable: T, level_hpa: 250}
+    convert: {scale: 1.0, offset: -273.15}
+    valid_range: [-100, 0]
+    level_hpa: 250
+    definition: The air temperature about 10 kilometres up, near the height where jet airliners fly.
+    why_it_matters: Warming here is strongest in the tropics, a fingerprint of how heat moves up from the surface.
+    scale: interval
+    domain: atmosphere
+    place_tags: [ocean, rainforest]
+    source_label: MERRA-2 reanalysis
+    coverage_start: 1980
+    known_breaks:
+      - [1998, "Satellite temperature sounders changed from MSU/SSU to AMSU in 1998-1999; upper-air values may step."]
+  M2_T30:
+    family: upper_air_temperature
+    name: Air temperature at 30 hPa (about 24 km up, stratosphere, MERRA-2)
+    units: degC
+    dataset: MERRA2
+    product: {short_name: M2IMNPASM, version: "5.12.4", variable: T, level_hpa: 30}
+    convert: {scale: 1.0, offset: -273.15}
+    valid_range: [-110, 0]
+    level_hpa: 30
+    definition: The air temperature about 24 kilometres up, in the stratosphere, above the weather and inside the ozone layer.
+    why_it_matters: Extra carbon dioxide cools the stratosphere while it warms the air below, so opposite trends here are a fingerprint of greenhouse gases.
+    scale: interval
+    domain: atmosphere
+    place_tags: [ocean, ice]
+    source_label: MERRA-2 reanalysis
+    coverage_start: 1980
+    known_breaks:
+      - [1998, "Satellite temperature sounders changed from MSU/SSU to AMSU in 1998-1999; stratospheric values may step."]
+  M2_AOD:
+    family: aerosol
+    name: Aerosol optical depth (MERRA-2)
+    units: unitless
+    dataset: MERRA2
+    product: {short_name: M2TMNXAER, version: "5.12.4", variable: TOTEXTTAU}
+    convert: {scale: 1.0, offset: 0.0}
+    valid_range: [0, 5]
+    definition: How much sunlight is blocked by haze, smoke, dust and pollution particles in the air (0 is perfectly clear).
+    why_it_matters: Particles harm lungs, dim sunlight and change clouds; trends track pollution rules, fires and dust storms.
+    scale: ratio
+    domain: atmosphere
+    place_tags: [city, desert]
+    source_label: MERRA-2 reanalysis (assimilates MODIS aerosol)
+    coverage_start: 1980
+  GPM_PRECIP:
+    family: precipitation
+    name: Precipitation (GPM IMERG)
+    units: mm/day
+    dataset: GPM_IMERG
+    product: {short_name: GPM_3IMERGM, version: "07", variable: precipitation}
+    convert: {scale: 24.0, offset: 0.0}
+    valid_range: [0, 200]
+    definition: How much rain and snow falls, measured by a fleet of satellites and checked against rain gauges, as a depth of water per day.
+    why_it_matters: Rainfall feeds rivers, crops and drinking water; changes bring drought or floods.
+    scale: ratio
+    domain: water
+    place_tags: [rainforest, desert, farmland, river_basin, coast, ocean]
+    source_label: GPM IMERG satellite precipitation
+    coverage_start: 2001
+    known_breaks:
+      - [2014, "Calibration switched from the TRMM satellite to the GPM Core Observatory in 2014."]
+  GLDAS_ET:
+    family: evaporation
+    name: Evaporation and plant transpiration (GLDAS)
+    units: mm/day
+    dataset: GLDAS
+    product: {short_name: GLDAS_NOAH025_M, version: "2.1", variable: Evap_tavg}
+    convert: {scale: 86400.0, offset: 0.0}
+    valid_range: [-5, 20]
+    definition: How much water leaves the land into the air each day, by evaporating from soil and water and by passing through plants.
+    why_it_matters: Evaporation links the water and energy cycles; rising rates can dry soils even when rainfall holds steady.
+    scale: ratio
+    domain: water
+    place_tags: [farmland, rainforest, desert, river_basin]
+    source_label: GLDAS Noah land model
+    coverage_start: 2000
+  GLDAS_RUNOFF:
+    family: runoff
+    name: Surface runoff plus baseflow (GLDAS)
+    units: mm/day
+    dataset: GLDAS
+    product: {short_name: GLDAS_NOAH025_M, version: "2.1", variable: [Qs_acc, Qsb_acc]}
+    convert: {scale: 8.0, offset: 0.0}
+    valid_range: [0, 200]
+    definition: Water that drains off and through the land toward rivers each day; the raw material of streamflow.
+    why_it_matters: Runoff sets how much water rivers carry for cities, farms and ecosystems, and how floods build.
+    scale: ratio
+    domain: water
+    place_tags: [river_basin, farmland, mountains, coast]
+    source_label: GLDAS Noah land model
+    coverage_start: 2000
+  GLDAS_SOILM:
+    family: soil_moisture
+    name: Soil moisture in the top 10 cm (GLDAS)
+    units: mm
+    dataset: GLDAS
+    product: {short_name: GLDAS_NOAH025_M, version: "2.1", variable: SoilMoi0_10cm_inst}
+    convert: {scale: 1.0, offset: 0.0}
+    valid_range: [0, 100]
+    definition: The water held in the top 10 centimetres of soil, as a depth of water.
+    why_it_matters: Topsoil moisture decides whether seeds sprout and crops grow, and is the first place drought appears.
+    scale: ratio
+    domain: land
+    place_tags: [farmland, desert, river_basin]
+    source_label: GLDAS Noah land model
+    coverage_start: 2000
+  GLDAS_SWE:
+    family: snow
+    name: Snow water equivalent (GLDAS)
+    units: mm
+    dataset: GLDAS
+    product: {short_name: GLDAS_NOAH025_M, version: "2.1", variable: SWE_inst}
+    convert: {scale: 1.0, offset: 0.0}
+    valid_range: [0, 5000]
+    definition: How much water is stored in the snowpack, as the depth of water it would make if it all melted.
+    why_it_matters: Mountain snowpack is a natural reservoir that feeds rivers through summer; shrinking snow means less water later.
+    scale: ratio
+    domain: water
+    place_tags: [mountains, ice, river_basin]
+    source_label: GLDAS Noah land model
+    coverage_start: 2000
+  AIRS_TSURF:
+    family: surface_temperature
+    name: Surface skin temperature (AIRS satellite)
+    units: degC
+    dataset: AIRS
+    product: {short_name: AIRS3STM, version: "7.0", variable: SurfSkinTemp_A}
+    convert: {scale: 1.0, offset: -273.15}
+    valid_range: [-90, 80]
+    definition: The temperature of the ground or sea surface, measured by an infrared sounder on the Aqua satellite during its daytime pass.
+    why_it_matters: A direct satellite measurement to compare against model temperatures like MERRA-2.
+    scale: interval
+    domain: land
+    place_tags: [desert, city, ice, ocean]
+    source_label: AIRS on Aqua
+    coverage_start: 2003
+  OMI_NO2:
+    family: air_pollution
+    name: Tropospheric nitrogen dioxide (OMI satellite)
+    units: 1e15 molecules/cm2
+    dataset: OMI
+    product: {short_name: OMNO2d, version: "004", variable: ColumnAmountNO2TropCloudScreened}
+    convert: {scale: 1.0e-15, offset: 0.0}
+    valid_range: [-5, 100]
+    min_valid_days: 5
+    grid_res: 0.5  # cities are small: keep finer cells than the 1-degree default
+    # OMNO2d is a global 0.25-degree grid; used only if its OPeNDAP view lacks lat/lon arrays
+    source_grid: {lat0: -89.875, dlat: 0.25, nlat: 720, lon0: -179.875, dlon: 0.25, nlon: 1440}
+    definition: The amount of nitrogen dioxide gas in the lower atmosphere above a place, a pollutant made mostly by vehicles, power plants and industry.
+    why_it_matters: NO2 harms lungs and helps form smog and particles; trends show where pollution controls work and where emissions grow.
+    scale: ratio
+    domain: atmosphere
+    place_tags: [city]
+    source_label: OMI on Aura
+    coverage_start: 2005
+    known_breaks:
+      - [2007, "The OMI row anomaly began in 2007 and grew in 2008-2009, reducing how much of the ground the instrument sees each day."]

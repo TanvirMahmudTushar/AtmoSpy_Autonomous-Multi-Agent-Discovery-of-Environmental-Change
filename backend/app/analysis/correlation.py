@@ -30,6 +30,22 @@ def align_annual(dates_a: list[date], values_a: list[float], dates_b: list[date]
     return common, [years_a[y] for y in common], [years_b[y] for y in common]
 
 
+def detrend(years: list[int], values: list[float]) -> np.ndarray:
+    x, y = np.asarray(years, dtype=float), np.asarray(values, dtype=float)
+    return y - np.polyval(np.polyfit(x, y, 1), x)
+
+
+def correlate_detrended(years: list[int], x: list[float], y: list[float]) -> tuple[CorrelationResult | None, np.ndarray, np.ndarray]:
+    """Correlation of year-to-year anomalies with each series' own linear
+    trend removed. Two variables that both trend over the period correlate
+    strongly even with no physical link (shared time, not shared cause);
+    removing the trends tests whether they actually move together."""
+    if len(years) < 5:
+        return None, np.array([]), np.array([])
+    dx, dy = detrend(years, x), detrend(years, y)
+    return correlate(list(dx), list(dy), years), dx, dy
+
+
 def correlate(x: list[float], y: list[float], years: list[int]) -> CorrelationResult | None:
     if len(x) < 5:
         return None

@@ -1,0 +1,82 @@
+{
+  "_how_to": "For each case, run Giovanni (https://giovanni.gsfc.nasa.gov) 'Time Series, Area-Averaged' for the product variable, box and years below, download the CSV, and save it here under the given file name. The test then compares it with this app's cube for the same box.",
+  "cases": [
+    {
+      "file": "merra2_t2m_tibet.csv",
+      "variable": "M2_T2M",
+      "giovanni_variable": "M2TMNXSLV_5_12_4_T2M",
+      "bbox": [
+        28,
+        38,
+        79,
+        89
+      ],
+      "years": [
+        1990,
+        2020
+      ],
+      "unit_offset": -273.15,
+      "unit_scale": 1.0,
+      "min_r": 0.995,
+      "max_bias_sd": 0.1
+    },
+    {
+      "file": "gpm_precip_sahel.csv",
+      "variable": "GPM_PRECIP",
+      "giovanni_variable": "GPM_3IMERGM_07_precipitation",
+      "bbox": [
+        12,
+        18,
+        -16,
+        -6
+      ],
+      "years": [
+        2001,
+        2020
+      ],
+      "unit_offset": 0.0,
+      "unit_scale": 24.0,
+      "min_r": 0.995,
+      "max_bias_sd": 0.1
+    },
+    {
+      "file": "gldas_et_igp.csv",
+      "variable": "GLDAS_ET",
+      "giovanni_variable": "GLDAS_NOAH025_M_2_1_Evap_tavg",
+      "bbox": [
+        24,
+        31,
+        75,
+        85
+      ],
+      "years": [
+        2001,
+        2020
+      ],
+      "unit_offset": 0.0,
+      "unit_scale": 86400.0,
+      "min_r": 0.995,
+      "max_bias_sd": 0.1
+    },
+    {
+      "file": "omi_no2_delhi.csv",
+      "variable": "OMI_NO2",
+      "giovanni_variable": "OMNO2d_004_ColumnAmountNO2TropCloudScreened",
+      "bbox": [
+        27.6,
+        29.6,
+        76.1,
+        78.1
+      ],
+      "years": [
+        2005,
+        2020
+      ],
+      "unit_offset": 0.0,
+      "unit_scale": 1e-15,
+      "min_r": 0.97,
+      "max_bias_sd": 0.25
+    }
+  ],
+  "_thresholds": "min_r: correlation of monthly values; max_bias_sd: |mean difference| as a fraction of Giovanni's standard deviation. Looser for OMI because the city box does not align with grid-cell edges."
+}

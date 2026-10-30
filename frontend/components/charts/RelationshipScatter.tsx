@@ -10,7 +10,7 @@ export function RelationshipScatter({ data }: { data: ScatterChartData }) {
         <span className="text-sm text-[var(--chart-ink-secondary)]">
           {data.x_name} vs {data.y_name}
         </span>
-        <span className="text-xs text-[var(--chart-muted)]">
+        <span className="text-xs text-[var(--text-chart-muted)]">
           {data.correlation.method} r = {data.correlation.r.toFixed(2)}, p = {data.correlation.p_value.toFixed(4)}
         </span>
       </div>
@@ -46,7 +46,7 @@ export function RelationshipScatter({ data }: { data: ScatterChartData }) {
           <Scatter data={data.points} fill="var(--chart-series-3)" />
         </ScatterChart>
       </ResponsiveContainer>
-      <p className="mt-1 text-xs text-[var(--chart-muted)]">
+      <p className="mt-1 text-xs text-[var(--text-chart-muted)]">
         Association only — not evidence of causation. Each point is one year.
       </p>
     </div>

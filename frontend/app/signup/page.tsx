@@ -123,7 +123,7 @@ function SignupPageInner() {
           </label>
 
           {(mismatchError || error) && (
-            <p className="rounded-sm border border-[var(--chart-critical)] bg-[var(--app-panel-alt)] px-3 py-2 text-xs text-[var(--chart-critical)]">
+            <p className="rounded-sm border border-[var(--chart-critical)] bg-[var(--app-panel-alt)] px-3 py-2 text-xs text-[var(--text-critical)]">
               {mismatchError || error}
             </p>
           )}

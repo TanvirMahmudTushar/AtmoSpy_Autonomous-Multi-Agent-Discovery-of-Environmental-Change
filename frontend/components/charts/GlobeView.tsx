@@ -47,12 +47,22 @@ function dominantFinding(findings: FindingSummary[]): FindingSummary {
   return findings.reduce((best, f) => (score(f) > score(best) ? f : best), findings[0]);
 }
 
+function regionFromBbox(f: FindingSummary): RegionInfo | undefined {
+  if (!f.region_bbox) return undefined;
+  const [min_lat, max_lat, min_lon, max_lon] = f.region_bbox;
+  return {
+    code: f.region_code, name: f.region_name, kind: "custom", min_lat, max_lat, min_lon, max_lon,
+    centroid_lat: (min_lat + max_lat) / 2, centroid_lon: (min_lon + max_lon) / 2,
+  };
+}
+
 function aggregateByRegion(findings: FindingSummary[], regions: RegionInfo[]): RegionAgg[] {
   const regionByCode = new Map(regions.map((r) => [r.code, r]));
   const groups = new Map<string, RegionAgg>();
 
   for (const f of findings) {
-    const region = regionByCode.get(f.region_code);
+    // Drawn-box regions aren't in the preset list; use the finding's own box.
+    const region = regionByCode.get(f.region_code) ?? regionFromBbox(f);
     if (!region) continue;
     let agg = groups.get(f.region_code);
     if (!agg) {

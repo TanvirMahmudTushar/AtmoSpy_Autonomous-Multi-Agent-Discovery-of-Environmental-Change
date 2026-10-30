@@ -4,6 +4,7 @@ object — this is what gives the orchestrator real branching power (e.g.
 skip spatial/relationship agents, or abort after quality failure).
 """
 
+import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import date
@@ -25,7 +26,8 @@ class InvestigationState:
     plan: InvestigationPlan
     region: RegionDef
 
-    point_series: PointSeries | None = None
+    point_series: PointSeries | None = None  # the region's series (area mean, or centroid fallback)
+    sampling: dict = field(default_factory=dict)  # how point_series represents the region
     quality_report: QualityReport | None = None
     monthly: MonthlyBundle | None = None
     # Annual means: a cross-check on the monthly-anomaly trend, and the input
@@ -53,6 +55,8 @@ class InvestigationState:
     timelapse: dict | None = None
 
     related_variables: list[dict] = field(default_factory=list)
+    # background fetches of related-variable candidates, keyed (code, start, end)
+    related_prefetch: dict[tuple, asyncio.Task] = field(default_factory=dict, repr=False)
 
     narrative: dict | None = None
     visualizations: dict = field(default_factory=dict)

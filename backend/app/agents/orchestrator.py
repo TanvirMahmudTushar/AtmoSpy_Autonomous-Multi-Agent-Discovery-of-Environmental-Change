@@ -22,17 +22,20 @@ from app.agents import (
 )
 from app.agents.state import InvestigationState
 from app.db.session import AsyncSessionLocal
-from app.llm.planner import InvestigationPlan, build_plan
+from app.llm.planner import InvestigationPlan, build_plan, is_unavailable, region_for_plan
 from app.models import Investigation
 from app.nasa.catalog import dataset_code_for_variable
-from app.nasa.regions import REGIONS_BY_CODE
 from app.nasa.registry import get_adapter
 from app.services.events import StepRecorder
 
 logger = logging.getLogger(__name__)
 
 
-async def run_investigation(investigation_id: uuid.UUID, question: str) -> None:
+async def run_investigation(
+    investigation_id: uuid.UUID, question: str | None, plan: InvestigationPlan | None = None
+) -> None:
+    """Runs one investigation. `plan` is given for structured (wizard)
+    requests; otherwise it is built from the plain-language question."""
     async with AsyncSessionLocal() as session:
         investigation = (
             await session.execute(select(Investigation).where(Investigation.id == investigation_id))
@@ -40,12 +43,23 @@ async def run_investigation(investigation_id: uuid.UUID, question: str) -> None:
         recorder = StepRecorder(investigation_id, session)
 
         try:
-            await recorder.emit("ORCHESTRATOR", "running", "Understanding the question and building an investigation plan...")
-            plan = await build_plan(question)
-            region = REGIONS_BY_CODE[plan.region_code]
+            if plan is None:
+                await recorder.emit("ORCHESTRATOR", "running", "Understanding the question and building an investigation plan...")
+                plan = await build_plan(question)
+            else:
+                await recorder.emit("ORCHESTRATOR", "running", "Setting up the investigation you chose...")
+            if is_unavailable(plan):
+                investigation.status = "failed"
+                investigation.error = plan.unsupported_variable_note
+                investigation.completed_at = datetime.now(timezone.utc)
+                await session.commit()
+                await recorder.emit("ORCHESTRATOR", "error", plan.unsupported_variable_note or "Variable not available.")
+                return
+            region = region_for_plan(plan)
 
             investigation.plan = {
                 "variable_code": plan.variable_code, "region_code": plan.region_code,
+                "region_name": region.name, "bbox": list(plan.bbox) if plan.bbox else None,
                 "start_year": plan.start_year, "end_year": plan.end_year,
                 "compare_region_code": plan.compare_region_code,
                 "run_relationship_analysis": plan.run_relationship_analysis, "source": plan.source,
@@ -85,6 +99,16 @@ async def run_pipeline(session, recorder: StepRecorder, state: InvestigationStat
     public because it's reused by anything that builds an InvestigationState
     directly rather than parsing a question — app/agents/watch_runner.py, for
     the same reason discover.py's _run_candidate builds its own state."""
+    if state.plan.run_relationship_analysis:
+        # Related-variable downloads start now and overlap the main analysis.
+        relationship_agent.start_prefetch(state)
+    try:
+        return await _run_agents(session, recorder, state, allow_retry)
+    finally:
+        relationship_agent.cancel_prefetch(state)  # no-op once they're done
+
+
+async def _run_agents(session, recorder: StepRecorder, state: InvestigationState, allow_retry: bool) -> InvestigationState:
     state = await nasa_data_agent.run(session, recorder, state)
     if state.status == "failed":
         return state

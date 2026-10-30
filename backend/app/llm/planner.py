@@ -11,9 +11,8 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from app.llm.client import get_llm_client
-from app.nasa.catalog import VARIABLES_BY_CODE
-from app.nasa.power import POWER_VARIABLES
-from app.nasa.regions import REGIONS, REGIONS_BY_CODE, find_region_by_name
+from app.nasa.catalog import VARIABLES_BY_CODE, earliest_year, related_candidates
+from app.nasa.regions import REGIONS, REGIONS_BY_CODE, custom_region, find_region_by_name
 
 DEFAULT_START_YEAR = 1990
 CURRENT_YEAR = date.today().year
@@ -26,41 +25,77 @@ DEFAULT_END_YEAR = CURRENT_YEAR - 1
 # falls through to the proxy-with-explanation behavior automatically, no
 # extra bookkeeping required; once that dataset becomes active, matching
 # questions start routing there with zero further changes here.
-KEYWORD_TO_VARIABLE = {
-    "temperature": "T2M",
-    "warming": "T2M",
-    "heat": "T2M_MAX",
-    "cold": "T2M_MIN",
-    "precipitation": "PRECTOTCORR",
-    "rainfall": "PRECTOTCORR",
-    "rain": "PRECTOTCORR",
-    "drought": "PRECTOTCORR",
-    "humidity": "RH2M",
-    "soil moisture": "GWETROOT",
-    "root zone": "GWETROOT",
-    "surface moisture": "GWETTOP",
-    "wetness": "GWETROOT",
-    "solar": "ALLSKY_SFC_SW_DWN",
-    "radiation": "ALLSKY_SFC_SW_DWN",
-    "sunlight": "ALLSKY_SFC_SW_DWN",
-    "cloud": "ALLSKY_SFC_SW_DWN",
-    "wind": "WS2M",
-    "skin temperature": "TS",
-    "land surface temperature": "TS",
-    "ice sheet mass": "lwe_thickness",
-    "ice mass": "lwe_thickness",
-    "ice loss": "lwe_thickness",
-    "groundwater": "lwe_thickness",
-    "terrestrial water storage": "lwe_thickness",
-    "water storage": "lwe_thickness",
-    "mass anomaly": "lwe_thickness",
+# Each keyword lists candidate variables in order of preference; the first
+# active one wins. Keywords are checked in order, so more specific phrases
+# ("skin temperature", "stratosphere") come before general ones
+# ("temperature").
+KEYWORD_TO_VARIABLE: dict[str, list[str]] = {
+    "stratospher": ["M2_T30"],  # stratosphere, stratospheric
+    "upper atmosphere": ["M2_T250"],
+    "skin temperature": ["TS", "AIRS_TSURF"],
+    "land surface temperature": ["TS", "AIRS_TSURF"],
+    "nitrogen dioxide": ["OMI_NO2"],
+    "no2": ["OMI_NO2"],
+    "air pollution": ["OMI_NO2", "M2_AOD"],
+    "aerosol": ["M2_AOD"],
+    "haze": ["M2_AOD"],
+    "smog": ["OMI_NO2", "M2_AOD"],
+    "dust": ["M2_AOD"],
+    "water vapor": ["M2_TQV"],
+    "water vapour": ["M2_TQV"],
+    "evaporation": ["GLDAS_ET"],
+    "evapotranspiration": ["GLDAS_ET"],
+    "runoff": ["GLDAS_RUNOFF"],
+    "streamflow": ["GLDAS_RUNOFF"],
+    "river flow": ["GLDAS_RUNOFF"],
+    "snow": ["GLDAS_SWE"],
+    "ice sheet mass": ["lwe_thickness"],
+    "ice mass": ["lwe_thickness"],
+    "ice loss": ["lwe_thickness"],
+    "groundwater": ["lwe_thickness"],
+    "terrestrial water storage": ["lwe_thickness"],
+    "water storage": ["lwe_thickness"],
+    "mass anomaly": ["lwe_thickness"],
+    "temperature": ["T2M", "M2_T2M"],
+    "warming": ["T2M", "M2_T2M"],
+    "heat": ["T2M_MAX"],
+    "cold": ["T2M_MIN"],
+    "precipitation": ["GPM_PRECIP", "PRECTOTCORR"],
+    "rainfall": ["GPM_PRECIP", "PRECTOTCORR"],
+    "rain": ["GPM_PRECIP", "PRECTOTCORR"],
+    "drought": ["PRECTOTCORR", "GPM_PRECIP"],
+    "humidity": ["RH2M"],
+    "soil moisture": ["GWETROOT", "GLDAS_SOILM", "soil_moisture"],
+    "root zone": ["GWETROOT"],
+    "surface moisture": ["GWETTOP", "soil_moisture"],
+    "wetness": ["GWETROOT"],
+    "solar": ["ALLSKY_SFC_SW_DWN"],
+    "radiation": ["ALLSKY_SFC_SW_DWN"],
+    "sunlight": ["ALLSKY_SFC_SW_DWN"],
+    "cloud": ["ALLSKY_SFC_SW_DWN"],
+    "wind": ["WS2M"],
+    "pressure": ["M2_SLP"],
 }
 
 # A human-readable name for a keyword's target variable/dataset, used only
 # in the "not connected yet" message when that variable isn't active.
 UNSUPPORTED_VARIABLE_LABEL = {
     "lwe_thickness": "GRACE-FO terrestrial water storage / mass anomaly",
+    "OMI_NO2": "OMI nitrogen dioxide",
+    "M2_AOD": "MERRA-2 aerosol optical depth",
+    "M2_T30": "MERRA-2 stratospheric temperature",
+    "M2_T250": "MERRA-2 upper-air temperature",
+    "M2_TQV": "MERRA-2 water vapour",
+    "GLDAS_ET": "GLDAS evapotranspiration",
+    "GLDAS_RUNOFF": "GLDAS runoff",
+    "GLDAS_SWE": "GLDAS snow water equivalent",
+    "M2_SLP": "MERRA-2 sea-level pressure",
 }
+
+# Unavailable variables with a defensible stand-in: root-zone soil water is
+# one part of terrestrial water storage. Everything else unavailable stops
+# the investigation instead of analyzing an unrelated variable.
+PROXY_OK = {"lwe_thickness"}
 
 # Genuinely unintegrated — no variable code exists for these at all (not
 # even a stubbed adapter), unlike the KEYWORD_TO_VARIABLE entries above.
@@ -87,8 +122,55 @@ class InvestigationPlan:
     run_relationship_analysis: bool = False
     unsupported_variable_note: str | None = None
     reasoning: str = ""
-    source: str = "fallback"  # "llm" | "fallback"
+    source: str = "fallback"  # "llm" | "fallback" | "structured" | ...
     candidate_related_variables: list[str] = field(default_factory=list)
+    # A user-drawn box (min_lat, max_lat, min_lon, max_lon); region_code is then its bbox_ code.
+    bbox: tuple[float, float, float, float] | None = None
+
+
+def structured_plan(
+    variable_code: str,
+    region_code: str | None = None,
+    bbox: tuple[float, float, float, float] | None = None,
+    start_year: int | None = None,
+    end_year: int | None = None,
+    compare_region_code: str | None = None,
+    run_relationship_analysis: bool = False,
+) -> InvestigationPlan:
+    """A plan chosen directly (guided wizard), validated against the catalog.
+    Raises ValueError with a message fit to show the user."""
+    if variable_code not in VARIABLES_BY_CODE:
+        raise ValueError(f"Variable {variable_code!r} isn't available.")
+    if bbox is not None:
+        region = custom_region(*bbox)
+    elif region_code in REGIONS_BY_CODE:
+        region = REGIONS_BY_CODE[region_code]
+    else:
+        raise ValueError(f"Unknown region {region_code!r}.")
+    if compare_region_code is not None and compare_region_code not in REGIONS_BY_CODE:
+        raise ValueError(f"Unknown comparison region {compare_region_code!r}.")
+    first = earliest_year(variable_code)
+    start = max(start_year or DEFAULT_START_YEAR, first)
+    end = min(end_year or DEFAULT_END_YEAR, DEFAULT_END_YEAR)
+    if end <= start:
+        raise ValueError(f"The period must end after it starts; {VARIABLES_BY_CODE[variable_code].name} begins in {first}.")
+    return InvestigationPlan(
+        variable_code=variable_code,
+        region_code=region.code,
+        start_year=start,
+        end_year=end,
+        compare_region_code=compare_region_code,
+        run_spatial_analysis=True,
+        run_relationship_analysis=run_relationship_analysis,
+        reasoning=f"Chosen directly: {VARIABLES_BY_CODE[variable_code].name} over {region.name}, {start}-{end}.",
+        source="structured",
+        candidate_related_variables=related_candidates(variable_code),
+        bbox=(region.min_lat, region.max_lat, region.min_lon, region.max_lon) if bbox is not None else None,
+    )
+
+
+def region_for_plan(plan: InvestigationPlan):
+    return custom_region(*plan.bbox) if plan.bbox else REGIONS_BY_CODE[plan.region_code]
 
 
 def _extract_years(text: str) -> tuple[int, int]:
@@ -103,12 +185,21 @@ def _extract_years(text: str) -> tuple[int, int]:
 
 def _extract_variable(text: str) -> tuple[str, str | None]:
     lowered = text.lower()
-    for keyword, code in KEYWORD_TO_VARIABLE.items():
-        if keyword not in lowered:
+    for keyword, codes in KEYWORD_TO_VARIABLE.items():
+        if not re.search(rf"\b{re.escape(keyword)}", lowered):
             continue
-        if code in VARIABLES_BY_CODE:
-            return code, None
-        label = UNSUPPORTED_VARIABLE_LABEL.get(code, code)
+        active = [c for c in codes if c in VARIABLES_BY_CODE]
+        if active:
+            return active[0], None
+        label = UNSUPPORTED_VARIABLE_LABEL.get(codes[0], codes[0])
+        if codes[0] not in PROXY_OK:
+            # No honest stand-in exists (soil wetness says nothing about NO2 or
+            # the stratosphere), so return the unavailable code and let the
+            # orchestrator stop with this explanation.
+            return codes[0], (
+                f"You asked about {label}, which isn't available in this build yet (its data hasn't been "
+                "connected). Nothing was analyzed, rather than substituting an unrelated variable."
+            )
         return "GWETROOT", (
             f"You asked about {keyword}, which this build doesn't have a connected NASA source "
             f"for yet ({label} — adapter registered but requires Earthdata credentials). Showing "
@@ -129,6 +220,7 @@ def fallback_plan(question: str) -> InvestigationPlan:
     lowered = question.lower()
     variable_code, note = _extract_variable(question)
     start_year, end_year = _extract_years(question)
+    start_year = max(start_year, earliest_year(variable_code))
 
     region = find_region_by_name(question)
     region_code = region.code if region else "bangladesh"
@@ -160,11 +252,7 @@ def fallback_plan(question: str) -> InvestigationPlan:
         unsupported_variable_note=note,
         reasoning=reasoning,
         source="fallback",
-        # Deliberately POWER-only: relationship_agent.py correlates the seed
-        # variable against these, and mixing in a monthly, 2002-onward
-        # source (GRACE-FO) would need its own alignment/latency handling
-        # that hasn't been built — a scope boundary, not an oversight.
-        candidate_related_variables=[v.code for v in POWER_VARIABLES if v.code != variable_code],
+        candidate_related_variables=related_candidates(variable_code),
     )
 
 
@@ -180,11 +268,17 @@ Given a user's question, output ONLY a JSON object (no prose) with these fields:
 You must not invent variable or region codes outside the provided lists. You must not compute or state any statistic — that is done separately by deterministic tools."""
 
 
+def is_unavailable(plan: InvestigationPlan) -> bool:
+    return plan.variable_code not in VARIABLES_BY_CODE
+
+
 async def build_plan(question: str) -> InvestigationPlan:
     fallback = fallback_plan(question)
 
     llm = get_llm_client()
-    if not llm.is_available():
+    # An explicitly requested but unavailable variable stays unavailable: the
+    # LLM would otherwise pick some active variable that doesn't answer it.
+    if not llm.is_available() or is_unavailable(fallback):
         return fallback
 
     # Bare codes (e.g. "lwe_thickness") give the LLM no signal about what a
@@ -214,7 +308,7 @@ async def build_plan(question: str) -> InvestigationPlan:
 
         start_year = int(result.get("start_year") or DEFAULT_START_YEAR)
         end_year = int(result.get("end_year") or DEFAULT_END_YEAR)
-        start_year = max(1981, min(start_year, DEFAULT_END_YEAR))
+        start_year = max(earliest_year(variable_code), min(start_year, DEFAULT_END_YEAR))
         end_year = max(start_year + 4, min(end_year, DEFAULT_END_YEAR))
 
         return InvestigationPlan(
@@ -228,7 +322,7 @@ async def build_plan(question: str) -> InvestigationPlan:
             unsupported_variable_note=fallback.unsupported_variable_note,
             reasoning=str(result.get("reasoning", "")),
             source="llm",
-            candidate_related_variables=[v.code for v in POWER_VARIABLES if v.code != variable_code],
+            candidate_related_variables=related_candidates(variable_code),
         )
     except (TypeError, ValueError):
         return fallback

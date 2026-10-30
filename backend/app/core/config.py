@@ -45,7 +45,9 @@ class Settings(BaseSettings):
 
     NASA_POWER_BASE_URL: str = "https://power.larc.nasa.gov/api"
     NASA_POWER_MAX_CONCURRENCY: int = 4
-    NASA_POWER_CACHE_TTL_HOURS: int = 24
+    # Past years of NASA data almost never change, and investigations end at the
+    # last complete year, so a week-long cache saves repeated 5-10 s fetches.
+    NASA_POWER_CACHE_TTL_HOURS: int = 168
 
     # A NASA Earthdata Login bearer token (generated from the user's Earthdata
     # profile page, not a username/password) — the only thing that flips
@@ -60,6 +62,13 @@ class Settings(BaseSettings):
     # silently fails for any region near the cap.
     MAX_REGION_SPAN_DEGREES: float = 10.0
     MAX_SPATIAL_GRID_CELLS: int = 200
+
+    # Analysis-ready monthly cubes (built by scripts/build_cube.py). A local
+    # directory or an http(s) URL (e.g. a public Cloudflare R2 bucket); only
+    # the chunks a region touches are read. Empty = repo's data/cubes folder.
+    CUBE_BASE_URL: str = ""
+    # Cubes are 1 degree, so continent-sized boxes stay cheap to read.
+    MAX_CUBE_REGION_SPAN_DEGREES: float = 60.0
 
     DISCOVERY_MAX_CONCURRENCY: int = 4
 

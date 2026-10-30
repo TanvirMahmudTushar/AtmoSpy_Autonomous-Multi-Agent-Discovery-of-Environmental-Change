@@ -105,13 +105,25 @@ def template_narrative(facts: dict) -> dict:
     )
     pct = facts.get("percent_change")
     pct_txt = f", a total change of {pct:+.1f}% over the period" if pct is not None else ""
+    rate = (
+        f"{facts['trend_per_decade']:+.4g} {facts.get('trend_units', '')} per decade"
+        if facts.get("trend_per_decade") is not None
+        else f"{facts.get('trend_per_year', 0):+.4g} {facts.get('trend_units', '')} per year"
+    )
+    test = "the Mann-Kendall test, corrected for autocorrelation" if facts.get("trend_basis") else "the Mann-Kendall test"
 
     interpretation = (
         f"{facts.get('variable_name', 'The variable')} in {facts.get('region_name', 'the selected region')} "
-        f"shows a {direction} trend of {facts.get('trend_per_year', 0):+.4g} {facts.get('trend_units', '')} "
-        f"per year between {facts.get('start_year')} and {facts.get('end_year')}{pct_txt}. "
-        f"This trend is {sig_txt} under the Mann-Kendall test. "
+        f"shows a {direction} trend of {rate} between {facts.get('start_year')} and {facts.get('end_year')}"
+        f"{pct_txt}. This trend is {sig_txt} under {test}. "
     )
+    if facts.get("t_test_p_value") is not None:
+        interpretation += f"A t-test on the regression slope gives p = {facts['t_test_p_value']:.4f}. "
+    if sig != "statistically_significant" and facts.get("years_needed_to_detect"):
+        interpretation += (
+            f"A trend of this size typically needs about {facts['years_needed_to_detect']:.0f} years of data "
+            "to be detected, so a longer record may settle the question. "
+        )
     related = facts.get("related_variables") or []
     if related:
         top = related[0]
@@ -141,12 +153,16 @@ async def generate_narrative(facts: dict) -> dict:
         if result and "interpretation" in result:
             combined_text = f"{result.get('interpretation', '')} {result.get('limitations', '')}"
             flags = numeric_guardrail(combined_text, facts)
-            return {
-                "interpretation": result["interpretation"],
-                "limitations": result.get("limitations", ""),
-                "source": "llm",
-                "guardrail_flags": flags,
-            }
+            if not flags:
+                return {
+                    "interpretation": result["interpretation"],
+                    "limitations": result.get("limitations", ""),
+                    "source": "llm",
+                    "guardrail_flags": [],
+                }
+            # The LLM quoted numbers that don't trace back to the analysis:
+            # its text is discarded rather than shown with a warning.
+            return {**template_narrative(facts), "source": "template", "guardrail_flags": flags}
 
     fallback = template_narrative(facts)
     return {**fallback, "source": "template", "guardrail_flags": []}

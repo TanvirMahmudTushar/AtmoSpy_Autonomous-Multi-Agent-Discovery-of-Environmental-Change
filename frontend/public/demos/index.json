@@ -1,0 +1,37 @@
+[
+  {
+    "id": "hidden-by-seasons",
+    "kind": "investigation",
+    "title": "Hidden by the seasons",
+    "summary": "Arctic Alaska swings about 30 \u00b0C between winter and summer every year. Remove that cycle and a steady warming appears.",
+    "generated_at": "2026-10-30T13:24:17+00:00"
+  },
+  {
+    "id": "not-significant-yet",
+    "kind": "investigation",
+    "title": "Real, but not significant yet",
+    "summary": "Averaged over the whole Tibetan Plateau, temperature is rising, but natural ups and downs are large. How many more years until we can be sure?",
+    "generated_at": "2026-10-30T13:24:25+00:00"
+  },
+  {
+    "id": "vanishing-water",
+    "kind": "investigation",
+    "title": "Water disappearing underground",
+    "summary": "Satellites that weigh water by its gravity see northern India's stored water falling, a sign of groundwater pumping.",
+    "generated_at": "2026-10-30T13:24:35+00:00"
+  },
+  {
+    "id": "whats-changing-sahel",
+    "kind": "scan",
+    "title": "What is changing in the Sahel?",
+    "summary": "Test every variable over the West Sahel at once, and correct for testing so many, to see what has really changed since 1990.",
+    "generated_at": "2026-10-30T13:24:38+00:00"
+  },
+  {
+    "id": "opposite-heights",
+    "kind": "pair",
+    "title": "Same cause, opposite directions",
+    "summary": "Over South Asia and its seas (5 to 35 N, 60 to 100 E), the air 5 km up has warmed while the stratosphere 24 km up has cooled. Extra carbon dioxide does both: two heights, one cause, opposite trends.",
+    "generated_at": "2026-10-30T19:15:50+00:00"
+  }
+]

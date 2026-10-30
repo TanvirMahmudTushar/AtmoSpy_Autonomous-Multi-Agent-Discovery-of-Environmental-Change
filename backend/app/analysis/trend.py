@@ -98,11 +98,26 @@ def _lag1(resid: np.ndarray, scale: float) -> float:
     return 0.0 if np.isnan(r1) else r1
 
 
-def _pairwise_slopes(x: np.ndarray, y: np.ndarray) -> np.ndarray:
-    i, j = np.triu_indices(len(x), 1)
+def _pairwise(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, float, float]:
+    """Sorted pairwise slopes (for Sen's slope and its CI) and the
+    Mann-Kendall S statistic with its tie-corrected variance, from one pass
+    over all pairs i < j. Same formulas as pymannkendall's original_test
+    (Kendall 1975), vectorized: its Python loops were most of the cost of a
+    per-cell spatial map (tested equal in tests/test_trend_v2.py)."""
+    n = len(y)
+    i, j = np.triu_indices(n, 1)
+    dy = y[j] - y[i]
     dx = x[j] - x[i]
+    s = float(np.sign(dy).sum())
+    _, ties = np.unique(y, return_counts=True)
+    ties = ties[ties > 1].astype(float)
+    var_s = (n * (n - 1) * (2 * n + 5) - float(np.sum(ties * (ties - 1) * (2 * ties + 5)))) / 18.0
     keep = dx != 0
-    return np.sort((y[j][keep] - y[i][keep]) / dx[keep])
+    return np.sort(dy[keep] / dx[keep]), s, var_s
+
+
+def _pairwise_slopes(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    return _pairwise(x, y)[0]
 
 
 def _seasonal_mk_p(monthly: pd.Series) -> float | None:
@@ -127,11 +142,14 @@ def compute_trend(
     variability_std: float | None = None,
     seasonal_series: pd.Series | None = None,
     alpha: float = ALPHA,
+    cross_checks: bool = True,
 ) -> TrendResult:
     """Trend statistics for values sampled at times x (calendar years or
     decimal years). For basis="monthly_anomaly", pass the raw series'
     mean as `reference_mean` (anomalies average ~0, so % change needs the
     real level) and the annual detrended SD as `variability_std`.
+    `cross_checks=False` skips the pre-whitened MK cross-check (used for the
+    many cells of a spatial map, where only the headline test is shown).
     """
     x = np.asarray(x, dtype=float)
     y = np.asarray(values, dtype=float)
@@ -168,9 +186,11 @@ def compute_trend(
     ols_ci = (float(ols.slope - t_crit * se_adj), float(ols.slope + t_crit * se_adj))
 
     # Mann-Kendall with lag-1 variance correction, and Sen's slope + CI
-    mk_orig = mk.original_test(y, alpha=alpha)
-    var_s = float(mk_orig.var_s) * vif
-    s = float(mk_orig.s)
+    slopes, s, var_s0 = _pairwise(x, y)
+    z0 = (s - np.sign(s)) / np.sqrt(var_s0) if (s != 0 and var_s0 > 0) else 0.0
+    p_mk_original = float(2 * stats.norm.sf(abs(z0)))
+    tau = s / (0.5 * n * (n - 1))
+    var_s = var_s0 * vif
     z = (s - np.sign(s)) / np.sqrt(var_s) if (s != 0 and var_s > 0) else 0.0
     p_mk = float(2 * stats.norm.sf(abs(z)))
     if p_mk < alpha:
@@ -178,7 +198,6 @@ def compute_trend(
     else:
         mk_trend = "no trend"
 
-    slopes = _pairwise_slopes(x, y)
     sen_slope = float(np.median(slopes))
     med_x, med_y = float(np.median(x)), float(np.median(y))
     sen_intercept = med_y - sen_slope * med_x
@@ -189,10 +208,12 @@ def compute_trend(
     m2 = int(np.ceil((big_n + c_alpha) / 2))
     sen_ci = (float(slopes[max(0, m1)]), float(slopes[min(big_n - 1, m2)]))
 
-    try:
-        p_pw = float(mk.pre_whitening_modification_test(y, alpha=alpha).p)
-    except Exception:
-        p_pw = None
+    p_pw = None
+    if cross_checks:
+        try:
+            p_pw = float(mk.pre_whitening_modification_test(y, alpha=alpha).p)
+        except Exception:
+            p_pw = None
 
     span = float(x[-1] - x[0])
     total_change = sen_slope * span
@@ -216,7 +237,7 @@ def compute_trend(
         mk_trend=mk_trend,
         mk_p_value=p_mk,
         mk_z=float(z),
-        mk_tau=float(mk_orig.Tau),
+        mk_tau=float(tau),
         sen_slope_per_year=sen_slope,
         sen_intercept=float(sen_intercept),
         total_change=float(total_change),
@@ -234,7 +255,7 @@ def compute_trend(
         ols_ci_lower=ols_ci[0],
         ols_ci_upper=ols_ci[1],
         ols_p_value_naive=float(ols.pvalue),
-        mk_p_value_original=float(mk_orig.p),
+        mk_p_value_original=p_mk_original,
         mk_p_value_prewhitened=p_pw,
         seasonal_mk_p_value=_seasonal_mk_p(seasonal_series) if seasonal_series is not None else None,
         slope_per_decade=sen_slope * 10,
@@ -261,16 +282,17 @@ def _detrended_std(years: list[int], values: list[float]) -> float | None:
     return float(np.std(y - np.polyval(coef, x), ddof=2))
 
 
-def primary_trend(bundle: MonthlyBundle, seasonal_test: bool = True) -> TrendResult:
+def primary_trend(bundle: MonthlyBundle, cross_checks: bool = True) -> TrendResult:
     """Headline trend. Uses monthly anomalies (seasonal cycle removed; every
     month of data, so the most statistical power) when there are enough
     months and the calendar months vary comparably; otherwise annual means.
     Slope, CI and p-value always come from the same series, so a CI that
-    includes zero never sits next to 'significant'."""
+    includes zero never sits next to 'significant'. cross_checks=False skips
+    the seasonal and pre-whitened Mann-Kendall cross-checks (map cells)."""
     years = [int(y) for y in bundle.annual.index]
     values = [float(v) for v in bundle.annual.values]
     variability = _detrended_std(years, values)
-    seasonal = bundle.monthly if seasonal_test else None
+    seasonal = bundle.monthly if cross_checks else None
     anom = bundle.anomalies.dropna()
     ratio = timeseries.seasonal_sd_ratio(anom)
     ratio_out = ratio if np.isfinite(ratio) else None
@@ -290,12 +312,15 @@ def primary_trend(bundle: MonthlyBundle, seasonal_test: bool = True) -> TrendRes
             reference_mean=float(np.nanmean(bundle.climatology)),
             variability_std=variability,
             seasonal_series=seasonal,
+            cross_checks=cross_checks,
         )
         result.basis_reason = "Monthly values with the average seasonal cycle removed were tested, using every month of data."
         result.seasonal_sd_ratio = ratio_out
         return result
 
-    result = compute_trend(years, values, variability_std=variability, seasonal_series=seasonal)
+    result = compute_trend(
+        years, values, variability_std=variability, seasonal_series=seasonal, cross_checks=cross_checks
+    )
     result.basis_reason = reason
     result.seasonal_sd_ratio = ratio_out
     return result

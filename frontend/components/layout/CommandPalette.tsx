@@ -19,11 +19,14 @@ interface PaletteItem {
 
 const STATIC_PAGES: { title: string; subtitle: string; href: string; icon: IconName }[] = [
   { title: "Home", subtitle: "Your mission dashboard", href: "/home", icon: "star" },
-  { title: "Discover Changes", subtitle: "Autonomous scan across NASA POWER", href: "/discover", icon: "telescope" },
+  { title: "Be a Trend Detective", subtitle: "Guided: pick a place, a variable and the years", href: "/detect", icon: "compass" },
+  { title: "Discover Changes", subtitle: "Autonomous scan of 16 region and variable pairs", href: "/discover", icon: "telescope" },
   { title: "Investigate a Question", subtitle: "Ask in plain language", href: "/investigate", icon: "compass" },
   { title: "Globe", subtitle: "Every finding plotted where it happened", href: "/globe", icon: "earth" },
   { title: "Watches", subtitle: "Standing checks on a region and variable", href: "/watches", icon: "satellite" },
   { title: "Findings", subtitle: "All discovered environmental changes", href: "/findings", icon: "notebook" },
+  { title: "Watch a Demo", subtitle: "Guided replays of real investigations", href: "/demos", icon: "satellite" },
+  { title: "Learn the Words", subtitle: "Plain definitions of every science term", href: "/learn", icon: "notebook" },
   { title: "About", subtitle: "Methodology, limitations, citations", href: "/about", icon: "magnifier" },
 ];
 

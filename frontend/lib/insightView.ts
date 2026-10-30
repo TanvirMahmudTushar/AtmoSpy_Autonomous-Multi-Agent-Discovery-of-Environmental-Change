@@ -19,6 +19,15 @@ export const CONCERN_COLOR: Record<Concern, string> = {
   serious: "var(--chart-critical)",
 };
 
+/** The same levels for text (labels), using the text-safe tokens (WCAG AA);
+ * CONCERN_COLOR stays for the meter's filled bars. */
+export const CONCERN_TEXT_COLOR: Record<Concern, string> = {
+  none: "var(--app-muted)",
+  watch: "var(--text-warning)",
+  concerning: "var(--app-accent-clay)",
+  serious: "var(--text-critical)",
+};
+
 export const CONFIDENCE_LABEL: Record<Confidence, string> = {
   high: "High",
   medium: "Medium",
