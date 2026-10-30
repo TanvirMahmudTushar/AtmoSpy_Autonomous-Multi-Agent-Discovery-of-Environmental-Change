@@ -134,7 +134,7 @@ Findings record an analysis version, so findings made before this method keep di
 
 ## Run it locally
 
-You need Python 3.12 or newer, Node 20 or newer and Docker.
+You need Python 3.12 or newer, Node 22.18 or newer (the frontend tests run TypeScript directly) and Docker.
 
 ```bash
 cp .env.example .env
