@@ -33,5 +33,12 @@
     "title": "Same cause, opposite directions",
     "summary": "Over South Asia and its seas (5 to 35 N, 60 to 100 E), the air 5 km up has warmed while the stratosphere 24 km up has cooled. Extra carbon dioxide does both: two heights, one cause, opposite trends.",
     "generated_at": "2026-10-30T19:15:50+00:00"
+  },
+  {
+    "id": "city-air",
+    "kind": "pair",
+    "title": "City air: cleaner in one place, dirtier in another",
+    "summary": "Over the same 21 years (2005 to 2025), nitrogen dioxide from traffic and industry fell over Los Angeles and rose over fast-growing Dhaka.",
+    "generated_at": "2026-10-30T20:28:52+00:00"
   }
 ]

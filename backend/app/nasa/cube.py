@@ -94,7 +94,14 @@ def load_manifest() -> dict:
 
 @lru_cache(maxsize=64)
 def open_cube(variable: str) -> xr.Dataset:
-    return xr.open_zarr(fsspec.get_mapper(f"{cube_base()}/{variable}.zarr"), consolidated=True)
+    # A cube is a Zarr directory, or the same store zipped into one file
+    # (manifest "store": "X.zarr.zip", see scripts/pack_cubes.py) so it can be
+    # hosted as a single download such as a GitHub release asset. Zip reads
+    # use HTTP range requests, so only the chunks a region touches are fetched.
+    store = load_manifest().get(variable, {}).get("store", f"{variable}.zarr")
+    url = f"{cube_base()}/{store}"
+    mapper = fsspec.get_mapper(f"zip::{url}") if store.endswith(".zip") else fsspec.get_mapper(url)
+    return xr.open_zarr(mapper, consolidated=True)
 
 
 class CubeAdapter(NASADataAdapter):

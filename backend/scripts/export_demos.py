@@ -74,9 +74,9 @@ DEMOS = [
         "id": "city-air",
         "kind": "pair",
         "title": "City air: cleaner in one place, dirtier in another",
-        "summary": "Nitrogen dioxide from traffic and industry has fallen over Beijing but risen over Dhaka.",
+        "summary": "Over the same 21 years (2005 to 2025), nitrogen dioxide from traffic and industry fell over Los Angeles and rose over fast-growing Dhaka.",
         "requests": [
-            {"variable_code": "OMI_NO2", "region_code": "beijing", "start_year": 2005, "end_year": LAST},
+            {"variable_code": "OMI_NO2", "region_code": "los_angeles", "start_year": 2005, "end_year": LAST},
             {"variable_code": "OMI_NO2", "region_code": "dhaka", "start_year": 2005, "end_year": LAST},
         ],
     },

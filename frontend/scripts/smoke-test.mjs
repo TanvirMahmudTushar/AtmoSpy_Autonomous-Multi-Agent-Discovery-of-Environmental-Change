@@ -46,8 +46,15 @@ page.on("console", (m) => {
   if (m.type() === "error") errors.push(`[console] ${m.text()}`);
 });
 
+// Wait for our own document, then give third-party resources (map tiles,
+// fonts) a bounded chance to finish: a slow tile server must not fail CI.
+async function open(url) {
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.waitForLoadState("load", { timeout: 15000 }).catch(() => {});
+}
+
 for (const path of PAGES) {
-  await page.goto(`${BASE}${path}`, { waitUntil: "load", timeout: 20000 });
+  await open(`${BASE}${path}`);
   // a demo replays its agent log for a few seconds before the report and tour appear
   await page.waitForTimeout(path.startsWith("/demos/") ? 6000 : 500);
   if (A11Y_PAGES.has(path)) await audit(path);
@@ -58,7 +65,7 @@ try {
   const res = await page.request.get(`${API_BASE}/api/findings?limit=1`);
   const findings = await res.json();
   if (findings.length > 0) {
-    await page.goto(`${BASE}/findings/${findings[0].id}`, { waitUntil: "load", timeout: 20000 });
+    await open(`${BASE}/findings/${findings[0].id}`);
     await page.waitForTimeout(3000); // MapLibre/Recharts need real time to finish loading
     await audit(`/findings/${findings[0].id}`);
     console.log(`checked /findings/${findings[0].id}`);

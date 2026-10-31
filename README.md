@@ -170,7 +170,14 @@ python -m scripts.build_cube --var M2_T2M --var GPM_PRECIP
 python -m scripts.build_cube --dataset MERRA2 --start 1980
 ```
 
-This needs `NASA_EARTHDATA_TOKEN`, and the GES DISC data use agreement must be accepted on that Earthdata account (Earthdata Login, then your profile, then EULAs, and authorize the GES DISC application). Without it GES DISC answers "EULA Acceptance Failure" and the build stops with that message. Cubes are written to `data/cubes/` with a `manifest.json` recording each product's version, DOI and granule count. To serve them from object storage, upload the folder and set `CUBE_BASE_URL`. A variable appears in the app only once its cube exists.
+This needs `NASA_EARTHDATA_TOKEN`, and the GES DISC data use agreement must be accepted on that Earthdata account (Earthdata Login, then your profile, then EULAs, and authorize the GES DISC application). Without it GES DISC answers "EULA Acceptance Failure" and the build stops with that message. Cubes are written to `data/cubes/` with a `manifest.json` recording each product's version, DOI and granule count. A variable appears in the app only once its cube exists.
+
+To host the cubes, `python -m scripts.pack_cubes` zips each one into a single file in `data/cubes_release/`, along with a manifest that points the app at the zips. Upload that folder anywhere that serves plain files and set `CUBE_BASE_URL` to it. The app reads zipped cubes with HTTP range requests, so it still downloads only the parts a region needs. The current cubes are published as the `data-v1` release of this repository:
+
+```bash
+gh release create data-v1 ../data/cubes_release/* --title "Data cubes v1" --latest=false
+# CUBE_BASE_URL=https://github.com/TanvirMahmudTushar/AtmoSpy_Autonomous-Multi-Agent-Discovery-of-Environmental-Change/releases/download/data-v1
+```
 
 ### Checking the cubes against the original files
 
@@ -218,7 +225,7 @@ With both servers running, `node scripts/smoke-test.mjs http://localhost:3000` (
 
 ## Deployment
 
-The frontend deploys to Vercel, the backend to Render using `render.yaml`, and the database to Supabase. Set `NEXT_PUBLIC_API_URL` on Vercel to the Render URL, then set `CORS_ORIGINS` on Render to the Vercel URL.
+The frontend deploys to Vercel, the backend to Render using `render.yaml`, and the database to Supabase. Set `NEXT_PUBLIC_API_URL` on Vercel to the Render URL, then set `CORS_ORIGINS` on Render to the Vercel URL. Set `CUBE_BASE_URL` on Render to the `data-v1` release URL above so the deployed backend can read the MERRA-2, GLDAS, GPM, AIRS and OMI cubes.
 
 ## Limitations
 

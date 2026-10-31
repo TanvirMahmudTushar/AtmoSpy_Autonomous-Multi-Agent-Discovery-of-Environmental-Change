@@ -135,3 +135,25 @@ async def test_cube_adapter_rejects_continent_plus_boxes(tiny_cube):
     adapter = cube.CubeAdapter(dataset_specs()["MERRA2"], [cube_variable_specs()["M2_T2M"]], cube.load_manifest())
     with pytest.raises(Exception, match="degrees"):
         await adapter.query_grid_series("M2_T2M", -50, 40, 0, 10, date(2000, 1, 1), date(2001, 1, 1))
+
+
+@pytest.mark.asyncio
+async def test_packed_zip_cube_reads_the_same_values(tiny_cube, monkeypatch):
+    # scripts/pack_cubes.py zips each store for single-file hosting (e.g. a
+    # GitHub release); the app must read the zip exactly like the directory.
+    from scripts.pack_cubes import pack
+
+    spec = cube_variable_specs()["M2_T2M"]
+    args = ("M2_T2M", 9.0, 11.0, 19.0, 21.0, date(2005, 1, 1), date(2009, 12, 31))
+    direct = await cube.CubeAdapter(dataset_specs()["MERRA2"], [spec], cube.load_manifest()).query_grid_series(*args)
+
+    out = tiny_cube / "release"
+    pack(tiny_cube, out)
+    assert json.loads((out / "manifest.json").read_text())["M2_T2M"]["store"] == "M2_T2M.zarr.zip"
+    get_settings.cache_clear()
+    cube.load_manifest.cache_clear()
+    cube.open_cube.cache_clear()
+    monkeypatch.setenv("CUBE_BASE_URL", str(out))
+    zipped = await cube.CubeAdapter(dataset_specs()["MERRA2"], [spec], cube.load_manifest()).query_grid_series(*args)
+
+    assert [(c.lat, c.lon, c.values) for c in zipped.cells] == [(c.lat, c.lon, c.values) for c in direct.cells]

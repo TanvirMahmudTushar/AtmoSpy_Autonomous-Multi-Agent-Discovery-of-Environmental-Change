@@ -93,6 +93,7 @@ terraform.tfstate*
 
 # Build output and caches
 data/cubes/
+data/cubes_release/
 .next/
 out/
 build/
