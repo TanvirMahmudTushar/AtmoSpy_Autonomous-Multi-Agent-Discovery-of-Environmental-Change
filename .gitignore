@@ -39,8 +39,7 @@ secrets.*.json
 *.sqlite3
 *.bak
 
-# Per-developer tool settings
-.claude/settings.local.json
+
 
 pitch-video/
 

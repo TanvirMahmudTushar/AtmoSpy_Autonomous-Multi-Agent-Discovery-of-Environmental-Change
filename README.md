@@ -240,6 +240,33 @@ The frontend deploys to Vercel, the backend to Render using `render.yaml`, and t
 - The rate limiter, cache, event bus and Watch scheduler run in one process, so the backend is meant to run as a single instance.
 - Expensive requests are rate limited per IP: 30 investigations a minute, 10 region scans and 3 Discover runs per 10 minutes, 60 suggestion requests a minute. A whole classroom behind one school IP shares these limits.
 
+## Data sources and citations
+
+All Earth science data in AtmoSpy come from NASA and are used under the [NASA Earth Science Data and Information Policy](https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-information-policy), which makes them free to use and share. The cubes in the [`data-v1` release](https://github.com/TanvirMahmudTushar/AtmoSpy_Autonomous-Multi-Agent-Discovery-of-Environmental-Change/releases/tag/data-v1) are derived products (monthly means, regridded to 1° or 0.5°), not the original files. Please cite the original datasets below, not this project, when you use these numbers. The cubes were built from the versions listed, accessed 30 to 31 October 2026.
+
+**Data cubes, distributed by the Goddard Earth Sciences Data and Information Services Center (GES DISC), Greenbelt, MD, USA**
+
+- Global Modeling and Assimilation Office (GMAO) (2015), MERRA-2 tavgM_2d_slv_Nx: 2d, Monthly mean, Time-Averaged, Single-Level, Assimilation, Single-Level Diagnostics V5.12.4. [doi:10.5067/AP1B0BA5PD2K](https://doi.org/10.5067/AP1B0BA5PD2K). Used for 2 m air temperature, sea-level pressure and total precipitable water vapour.
+- Global Modeling and Assimilation Office (GMAO) (2015), MERRA-2 instM_3d_asm_Np: 3d, Monthly mean, Instantaneous, Pressure-Level, Assimilation, Assimilated Meteorological Fields V5.12.4. [doi:10.5067/2E096JV59PK7](https://doi.org/10.5067/2E096JV59PK7). Used for temperature at 850, 500, 250 and 30 hPa.
+- Global Modeling and Assimilation Office (GMAO) (2015), MERRA-2 tavgM_2d_aer_Nx: 2d, Monthly mean, Time-averaged, Single-Level, Assimilation, Aerosol Diagnostics V5.12.4. [doi:10.5067/FH9A0MLJPC7N](https://doi.org/10.5067/FH9A0MLJPC7N). Used for aerosol optical depth.
+- Beaudoing, H. and M. Rodell, NASA/GSFC/HSL (2020), GLDAS Noah Land Surface Model L4 monthly 0.25 x 0.25 degree V2.1. [doi:10.5067/SXAVCZFAQLNO](https://doi.org/10.5067/SXAVCZFAQLNO). Used for evapotranspiration, runoff, soil moisture and snow water equivalent.
+- Huffman, G.J., E.F. Stocker, D.T. Bolvin, E.J. Nelkin and J. Tan (2023), GPM IMERG Final Precipitation L3 1 month 0.1 degree x 0.1 degree V07. [doi:10.5067/GPM/IMERG/3B-MONTH/07](https://doi.org/10.5067/GPM/IMERG/3B-MONTH/07). Used for precipitation.
+- AIRS project (2019), Aqua/AIRS L3 Monthly Standard Physical Retrieval (AIRS-only) 1 degree x 1 degree V7.0. [doi:10.5067/UBENJB9D3T2H](https://doi.org/10.5067/UBENJB9D3T2H). Used for surface skin temperature.
+- Krotkov, N.A., L.N. Lamsal, S.V. Marchenko, B.L. Fisher, E.J. Bucsela, Z. Fasnacht, E.-S. Yang, W. Qin, A. Vasilkov, C. Li, J. Joiner, S. Choi and W.H. Swartz (2024), OMI/Aura NO2 Cloud-Screened Total and Tropospheric Column L3 Global Gridded 0.25 degree x 0.25 degree Ver 5.0, Col 004. [doi:10.5067/AURA/OMI/DATA3407](https://doi.org/10.5067/AURA/OMI/DATA3407). Used for tropospheric nitrogen dioxide.
+
+Reference papers for the model products:
+
+- Gelaro, R., et al. (2017), The Modern-Era Retrospective Analysis for Research and Applications, Version 2 (MERRA-2), *Journal of Climate*, 30, 5419–5454. [doi:10.1175/JCLI-D-16-0758.1](https://doi.org/10.1175/JCLI-D-16-0758.1).
+- Rodell, M., et al. (2004), The Global Land Data Assimilation System, *Bulletin of the American Meteorological Society*, 85, 381–394. [doi:10.1175/BAMS-85-3-381](https://doi.org/10.1175/BAMS-85-3-381).
+
+**Read live at request time**
+
+- NASA POWER: the data were obtained from the National Aeronautics and Space Administration (NASA) Langley Research Center (LaRC) Prediction of Worldwide Energy Resource (POWER) Project, funded through the NASA Earth Science/Applied Science Program. [power.larc.nasa.gov](https://power.larc.nasa.gov/).
+- Wiese, D.N., D.-N. Yuan, C. Boening, F.W. Landerer and M.M. Watkins, JPL GRACE and GRACE-FO Mascon Ocean, Ice, and Hydrology Equivalent Water Height Coastal Resolution Improvement (CRI) Filtered Release 06.3 Version 04, PO.DAAC, CA, USA. [doi:10.5067/TEMSC-3JC634](https://doi.org/10.5067/TEMSC-3JC634). Used for terrestrial water storage.
+- SMAP L3 Radiometer Global Daily 36 km EASE-Grid Soil Moisture, Version 9, NASA National Snow and Ice Data Center Distributed Active Archive Center. [doi:10.5067/4XXOGX0OOW1S](https://doi.org/10.5067/4XXOGX0OOW1S). Used for surface soil moisture.
+
+Each cube's product version, DOI, CMR record and granule count are also recorded in its `manifest.json`, and every finding report shows its data source and product version, with a BibTeX citation in its export menu.
+
 ## Credits
 
 Pixel art scenery is from Kenney's [Tiny Farm](https://kenney.nl/assets/tiny-farm), released under CC0. Not an official NASA product, and NASA does not endorse this project.
